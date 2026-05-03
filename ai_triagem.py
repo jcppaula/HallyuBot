@@ -58,7 +58,7 @@ REGRA_TOM_DE_VOZ = (
 
 REGRA_FORMATACAO = (
     "Retorne a resposta ESTRITAMENTE em formato JSON com as chaves: "
-    '"nota" (int de 1 a 10) e "justificativa" (string curta de até 80 caracteres). '
+    '"nota" (int de 1 a 10), "justificativa" (string curta de até 80 caracteres) e "resumo" (string de 3 a 4 linhas resumindo a notícia). '
     "Não inclua nenhum texto fora do JSON. Não use markdown."
 )
 
@@ -167,11 +167,12 @@ def avaliar_com_ia(cliente_openai, titulo, url):
         # Valida se as chaves esperadas existem
         nota = int(dados.get("nota", 3))
         justificativa = str(dados.get("justificativa", "Sem justificativa"))
+        resumo = str(dados.get("resumo", "Sem resumo disponível."))
 
         # Garante que a nota está no range válido (1-10)
         nota = max(1, min(10, nota))
 
-        return {"nota": nota, "justificativa": justificativa}
+        return {"nota": nota, "justificativa": justificativa, "resumo": resumo}
 
     except json.JSONDecodeError as e:
         print(f"    ⚠️  Erro ao decodificar JSON da IA: {e}")
@@ -182,15 +183,16 @@ def avaliar_com_ia(cliente_openai, titulo, url):
         return None
 
 
-def atualizar_noticia(noticia_id, nota, justificativa):
+def atualizar_noticia(noticia_id, nota, justificativa, resumo):
     """
-    Atualiza uma notícia no banco de dados com a nota da IA.
+    Atualiza uma notícia no banco de dados com a nota da IA e resumo.
     Muda o status de 'pendente_avaliacao' para 'avaliada'.
 
     Args:
         noticia_id: ID da notícia no banco.
         nota: Nota de temperatura (1-10) atribuída pela IA.
         justificativa: Texto curto explicando a nota.
+        resumo: Pequeno resumo da notícia.
     """
     try:
         conexao = sqlite3.connect(CAMINHO_BD)
@@ -200,9 +202,10 @@ def atualizar_noticia(noticia_id, nota, justificativa):
             UPDATE noticias
             SET temperatura = ?,
                 justificativa = ?,
+                resumo = ?,
                 status = 'avaliada'
             WHERE id = ?
-        """, (nota, justificativa, noticia_id))
+        """, (nota, justificativa, resumo, noticia_id))
 
         conexao.commit()
         conexao.close()
@@ -278,9 +281,10 @@ def executar_triagem():
         if resultado:
             nota = resultado["nota"]
             justificativa = resultado["justificativa"]
+            resumo = resultado.get("resumo", "")
 
             # Salva a avaliação no banco de dados
-            atualizar_noticia(noticia_id, nota, justificativa)
+            atualizar_noticia(noticia_id, nota, justificativa, resumo)
 
             # Exibe a nota atribuída
             # Emojis diferentes conforme a faixa de temperatura

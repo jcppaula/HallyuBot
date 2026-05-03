@@ -59,7 +59,7 @@ ATIVIDADES = itertools.cycle([
 def buscar_alertas_urgentes():
     try:
         con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        cur.execute("SELECT id, titulo, url, temperatura, justificativa, pilar FROM noticias WHERE status='avaliada' AND temperatura>=9 ORDER BY temperatura DESC")
+        cur.execute("SELECT id, titulo, url, temperatura, justificativa, pilar, resumo FROM noticias WHERE status='avaliada' AND temperatura>=9 ORDER BY temperatura DESC")
         r = cur.fetchall(); con.close(); return r
     except Exception as e:
         print(f"[ERRO] buscar_alertas: {e}"); return []
@@ -445,7 +445,7 @@ async def monitor_plantao():
         if not alertas or not CANAL_URGENTE_ID: return
         canal = client.get_channel(int(CANAL_URGENTE_ID))
         if not canal: return
-        for nid, titulo, url, temp, just, pilar in alertas:
+        for nid, titulo, url, temp, just, pilar, resumo in alertas:
             # Temp 10 = Bomba (dourado + @everyone) / Temp 9 = Urgente (vermelho + @here)
             is_bomba = temp == 10
             cor = COR_BOMBA if is_bomba else COR_URGENTE
@@ -461,6 +461,8 @@ async def monitor_plantao():
             embed.add_field(name="Temperatura", value=f"**{temp}/10**", inline=True)
             embed.add_field(name="Pilar", value=pilar, inline=True)
             embed.add_field(name="Impacto Estimado", value=classificar_impacto(temp), inline=False)
+            if resumo and str(resumo).strip() and str(resumo).lower() != "none":
+                embed.add_field(name="Resumo", value=resumo, inline=False)
             embed.add_field(name="Avaliacao da IA", value=just, inline=False)
             embed.add_field(name="Fonte Original", value=f"[Clique aqui]({url})", inline=False)
             embed.set_footer(text="HallyuBot V3 — Alerta Automatico | Clique no botao para gerar roteiro",
@@ -585,7 +587,7 @@ async def enviar_alertas_urgentes_agora():
             print("[AUTO-URGENTE] Sem alertas urgentes nesta rodada.", flush=True)
             return
 
-        for nid, titulo, url, temp, just, pilar in alertas:
+        for nid, titulo, url, temp, just, pilar, resumo in alertas:
             is_bomba = temp == 10
             cor = COR_BOMBA if is_bomba else COR_URGENTE
             titulo_embed = "BOMBA HALLYU — NOTICIA EXPLOSIVA" if is_bomba else "PLANTAO URGENTE — HALLYU NEWS"
@@ -600,6 +602,8 @@ async def enviar_alertas_urgentes_agora():
             embed.add_field(name="Temperatura", value=f"**{temp}/10**", inline=True)
             embed.add_field(name="Pilar", value=pilar, inline=True)
             embed.add_field(name="Impacto Estimado", value=classificar_impacto(temp), inline=False)
+            if resumo and str(resumo).strip() and str(resumo).lower() != "none":
+                embed.add_field(name="Resumo", value=resumo, inline=False)
             embed.add_field(name="Avaliacao da IA", value=just, inline=False)
             embed.add_field(name="Fonte Original", value=f"[Clique aqui]({url})", inline=False)
             embed.set_footer(text="HallyuBot V3 — Alerta Automatico | Clique no botao para gerar roteiro",
@@ -627,7 +631,7 @@ async def enviar_digest_noticias():
         # Busca noticias avaliadas com nota 5-8 que ainda nao foram enviadas
         con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
         cur.execute("""
-            SELECT id, titulo, url, temperatura, justificativa, pilar, fonte
+            SELECT id, titulo, url, temperatura, justificativa, pilar, fonte, resumo
             FROM noticias
             WHERE status = 'avaliada' AND temperatura BETWEEN 5 AND 8
             ORDER BY temperatura DESC, data_coleta DESC
@@ -652,7 +656,7 @@ async def enviar_digest_noticias():
         await canal.send(embed=embed_header)
 
         # Envia cada noticia como embed individual com botao
-        for nid, titulo, url, temp, just, pilar, fonte in noticias:
+        for nid, titulo, url, temp, just, pilar, fonte, resumo in noticias:
             # Emoji de temperatura
             if temp >= 8: emoji = "🟠"
             elif temp >= 6: emoji = "🟡"
@@ -666,6 +670,8 @@ async def enviar_digest_noticias():
             embed.add_field(name="Temperatura", value=f"**{temp}/10**", inline=True)
             embed.add_field(name="Pilar", value=pilar, inline=True)
             embed.add_field(name="Fonte", value=fonte or "—", inline=True)
+            if resumo and str(resumo).strip() and str(resumo).lower() != "none":
+                embed.add_field(name="Resumo", value=resumo[:1024], inline=False)
             embed.add_field(name="Avaliacao", value=just[:200] if just else "—", inline=False)
             embed.set_footer(text=f"ID: {nid} | Clique no botao abaixo para gerar roteiro")
 
