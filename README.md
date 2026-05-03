@@ -13,6 +13,7 @@ O **HallyuBot** é um bot de Discord autônomo que atua como um **Editor-Chefe i
 - **📋 Digest Interativo:** Notícias nota 5-8 são agrupadas num resumo periódico no Discord, também incluindo resumos práticos.
 - **📝 Geração de Roteiros (1 Clique):** Todas as notificações possuem um botão interativo do Discord. Basta clicar em "📝 Fazer Roteiro" e a IA redige um texto pronto (com Call To Action e ganchos) baseado em templates validados.
 - **💡 Motor de Ideias:** Comando `/ideia` para gerar ganchos virais para o TikTok/Reels quando o noticiário estiver calmo.
+- **📈 Monitoramento e Logs:** Relatórios automáticos enviados para um canal secreto no Discord toda vez que um ciclo termina, com alertas de erro marcando o administrador.
 
 ---
 
@@ -39,7 +40,7 @@ Ideal para deixar rodando num computador de casa. Este guia foi feito para qualq
 **Passo C: Configurando as Senhas**
 1. Abra a pasta do robô pelo explorador de arquivos do Windows 11. Você verá um arquivo chamado `.env.example`.
 2. Renomeie esse arquivo para `.env` (remova o `.example`).
-3. Abra esse arquivo `.env` com o Bloco de Notas e preencha as suas senhas (Discord, OpenAI, Apify, YouTube). Salve e feche.
+3. Abra esse arquivo `.env` com o Bloco de Notas e preencha as suas senhas (Discord, OpenAI, Apify, YouTube) e **seus IDs do Discord** (para o sistema de Logs). Salve e feche.
 
 **Passo D: Ligando o Robô (1 Clique)**
 1. Na pasta do robô, você verá um arquivo chamado **`iniciar_bot.bat`**.
