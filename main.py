@@ -74,7 +74,7 @@ def buscar_melhores_para_roteiro(limite=3):
         cur.execute("""
             SELECT id, titulo, url, temperatura, justificativa, pilar, fonte
             FROM noticias
-            WHERE status = 'avaliada' AND temperatura BETWEEN 5 AND 8
+            WHERE status IN ('avaliada', 'notificada') AND temperatura BETWEEN 5 AND 8
             ORDER BY temperatura DESC, data_coleta DESC LIMIT ?
         """, (limite,))
         noticias = cur.fetchall()
@@ -85,7 +85,7 @@ def buscar_melhores_para_roteiro(limite=3):
             falta = limite - len(noticias)
             cur.execute(f"""
                 SELECT id, titulo, url, temperatura, justificativa, pilar, fonte
-                FROM noticias WHERE status='avaliada' {filtro}
+                FROM noticias WHERE status IN ('avaliada', 'notificada') {filtro}
                 ORDER BY temperatura DESC, data_coleta DESC LIMIT ?
             """, (falta,))
             noticias.extend(cur.fetchall())
@@ -462,7 +462,7 @@ async def monitor_plantao():
             embed.add_field(name="Pilar", value=pilar, inline=True)
             embed.add_field(name="Impacto Estimado", value=classificar_impacto(temp), inline=False)
             if resumo and str(resumo).strip() and str(resumo).lower() != "none":
-                embed.add_field(name="Resumo", value=resumo, inline=False)
+                embed.add_field(name="Resumo", value=resumo[:1024], inline=False)
             embed.add_field(name="Avaliacao da IA", value=just, inline=False)
             embed.add_field(name="Fonte Original", value=f"[Clique aqui]({url})", inline=False)
             embed.set_footer(text="HallyuBot V3 — Alerta Automatico | Clique no botao para gerar roteiro",
@@ -603,7 +603,7 @@ async def enviar_alertas_urgentes_agora():
             embed.add_field(name="Pilar", value=pilar, inline=True)
             embed.add_field(name="Impacto Estimado", value=classificar_impacto(temp), inline=False)
             if resumo and str(resumo).strip() and str(resumo).lower() != "none":
-                embed.add_field(name="Resumo", value=resumo, inline=False)
+                embed.add_field(name="Resumo", value=resumo[:1024], inline=False)
             embed.add_field(name="Avaliacao da IA", value=just, inline=False)
             embed.add_field(name="Fonte Original", value=f"[Clique aqui]({url})", inline=False)
             embed.set_footer(text="HallyuBot V3 — Alerta Automatico | Clique no botao para gerar roteiro",

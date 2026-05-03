@@ -157,7 +157,7 @@ def avaliar_com_ia(cliente_openai, titulo, url):
             ],
             response_format={"type": "json_object"},
             temperature=0.3,  # Baixa temperatura = respostas mais consistentes
-            max_tokens=150     # Resposta curta (só JSON)
+            max_tokens=500     # JSON com nota, justificativa e resumo
         )
 
         # Extrai o conteúdo JSON da resposta
