@@ -112,7 +112,7 @@ Embora o bot opere com laços 100% autônomos de varredura e triagem em backgrou
 Se você quiser adicionar ou remover sites e contas monitoradas, o projeto é altamente modular:
 
 **Para sites de notícias (RSS):**
-Edite a variável `FONTES_RSS` no arquivo `scraper.py`.
+Edite a variável `FONTES_RSS` no arquivo `scraper.py`. O sistema agora conta com um mecanismo inteligente de **URLs alternativas (fallbacks)** e cabeçalhos customizados, garantindo que o bot não seja bloqueado por sites como Reddit e Soompi.
 
 **Para perfis em redes sociais:**
 Edite as listas no começo do arquivo `social_scraper.py`:

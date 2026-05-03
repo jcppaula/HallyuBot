@@ -18,6 +18,7 @@ import os
 import sys
 import time
 import random
+import requests
 from datetime import datetime
 
 # Corrige encoding do terminal no Windows (suporte a emojis e acentos)
@@ -56,18 +57,30 @@ FONTES_RSS = [
     {
         "nome": "Reddit r/kpop",
         "url": "https://www.reddit.com/r/kpop/top.rss",
+        "fallbacks": [
+            "https://old.reddit.com/r/kpop/top/.rss?t=day",
+            "https://www.reddit.com/r/kpop/new/.rss",
+        ],
         "pilar": "K-Pop"
     },
 
     # --- PILAR 2: K-Dramas ---
     {
         "nome": "Soompi (TV/Filmes)",
-        "url": "https://www.soompi.com/category/tv-film/feed",
+        "url": "https://www.soompi.com/category/tvfilm/feed",
+        "fallbacks": [
+            "https://www.soompi.com/category/tv-film/feed",
+            "https://www.soompi.com/feed",
+        ],
         "pilar": "K-Drama"
     },
     {
         "nome": "Reddit r/KDRAMA",
         "url": "https://www.reddit.com/r/KDRAMA/top.rss",
+        "fallbacks": [
+            "https://old.reddit.com/r/KDRAMA/top/.rss?t=day",
+            "https://www.reddit.com/r/KDRAMA/new/.rss",
+        ],
         "pilar": "K-Drama"
     },
 
@@ -75,6 +88,10 @@ FONTES_RSS = [
     {
         "nome": "DramaPanda",
         "url": "https://dramapanda.com/feed",
+        "fallbacks": [
+            "https://dramapanda.com/feed/",
+            "https://www.dramapanda.com/feed/",
+        ],
         "pilar": "Cultura Chinesa"
     },
     {
@@ -85,9 +102,31 @@ FONTES_RSS = [
     {
         "nome": "Reddit r/CDrama",
         "url": "https://www.reddit.com/r/CDrama/top.rss",
+        "fallbacks": [
+            "https://old.reddit.com/r/CDrama/top/.rss?t=day",
+            "https://www.reddit.com/r/CDrama/new/.rss",
+        ],
         "pilar": "Cultura Chinesa"
     },
 ]
+
+HEADERS_RSS = {
+    "User-Agent": (
+        "HallyuBot/3.0 (+https://github.com/) "
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+    "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7",
+}
+
+
+def baixar_e_parsear_feed(url_feed):
+    """Baixa o RSS com headers completos e devolve o objeto parseado."""
+    resposta = requests.get(url_feed, headers=HEADERS_RSS, timeout=20)
+    resposta.raise_for_status()
+    return feedparser.parse(resposta.content)
 
 # =============================================
 # Fontes para Plano B (BeautifulSoup) — Implementação futura
@@ -142,22 +181,34 @@ def coletar_feed_rss(fonte):
     """
     noticias = []
     nome_fonte = fonte["nome"]
-    url_feed = fonte["url"]
     pilar = fonte["pilar"]
+    urls_para_tentar = [fonte["url"]] + fonte.get("fallbacks", [])
 
     print(f"  📡 Lendo feed: {nome_fonte}...", end=" ")
 
     try:
-        # Agent customizado para evitar bloqueios 403 (ex: Reddit, Soompi)
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 HallyuBot/3.0'}
-        
-        # Faz a requisição e parseia o feed RSS/Atom
-        feed = feedparser.parse(url_feed, agent=headers['User-Agent'])
+        feed = None
+        ultimo_erro = None
+        url_usada = None
+
+        for tentativa, url_feed in enumerate(urls_para_tentar, 1):
+            try:
+                feed_tentativa = baixar_e_parsear_feed(url_feed)
+                if feed_tentativa.entries:
+                    feed = feed_tentativa
+                    url_usada = url_feed
+                    break
+                ultimo_erro = getattr(feed_tentativa, "bozo_exception", "sem entradas")
+            except Exception as e:
+                ultimo_erro = e
+
+            if tentativa < len(urls_para_tentar):
+                time.sleep(1)
 
         # Verifica se o feed retornou entradas válidas
-        if feed.bozo and not feed.entries:
-            # 'bozo' indica que o feed teve problemas de parsing
-            print(f"⚠️  Feed com problemas ou inacessível.")
+        if not feed:
+            detalhe = str(ultimo_erro)[:120] if ultimo_erro else "sem detalhe"
+            print(f"⚠️  Feed com problemas ou inacessível ({detalhe}).")
             return noticias
 
         # Itera pelas entradas (artigos) do feed
@@ -184,7 +235,8 @@ def coletar_feed_rss(fonte):
                 "data_publicacao": data_pub
             })
 
-        print(f"✅ {len(noticias)} entradas encontradas.")
+        sufixo = "" if url_usada == fonte["url"] else " (fallback)"
+        print(f"✅ {len(noticias)} entradas encontradas{sufixo}.")
 
     except Exception as e:
         print(f"❌ Erro ao ler feed: {e}")
