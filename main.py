@@ -539,13 +539,14 @@ async def varredura_automatica():
         print(f"[AUTO-RSS] {novas_rss} novas | {ign_rss} duplicadas", flush=True)
 
         # Fase 3: Triagem com IA (se ha pendentes)
+        stats_triagem = None
         if novas_rss > 0:
             print(f"[AUTO-TRIAGEM] {novas_rss} noticias novas (RSS), iniciando triagem com IA...", flush=True)
             # Pequena pausa para o banco estabilizar
             await asyncio.sleep(5)
             from ai_triagem import executar_triagem
             ids_pendentes = buscar_ids_pendentes_triagem()
-            await asyncio.to_thread(executar_triagem)
+            stats_triagem = await asyncio.to_thread(executar_triagem)
             print(f"[AUTO-TRIAGEM] Concluida.", flush=True)
 
             # Fase 4: Enviar alertas URGENTES (nota 9-10) IMEDIATAMENTE com botoes
@@ -559,7 +560,12 @@ async def varredura_automatica():
         # Limpeza periodica
         limpar_banco_antigo(dias=15)
         
-        await enviar_log_discord(f"Varredura concluída. **{novas_rss}** novas notícias coletadas.\nDuplicadas ignoradas: {ign_rss}", "Varredura RSS Concluída")
+        # Envia o relatório final
+        msg_log = f"**📡 RSS:** {novas_rss} novas | {ign_rss} duplicadas ignoradas\n"
+        if stats_triagem:
+            msg_log += f"\n**🧠 Triagem da IA:**\n✅ {stats_triagem.get('avaliadas', 0)} avaliadas com sucesso\n❌ {stats_triagem.get('erros', 0)} falhas/erros\n🚨 {stats_triagem.get('urgentes', 0)} plantões urgentes disparados"
+            
+        await enviar_log_discord(msg_log, "Resumo da Varredura Completa")
 
     except Exception as e:
         print(f"[ERRO] varredura_automatica: {e}", flush=True)
@@ -602,14 +608,16 @@ async def varredura_social_diaria():
             await asyncio.sleep(5)
             from ai_triagem import executar_triagem
             ids_pendentes = buscar_ids_pendentes_triagem()
-            await asyncio.to_thread(executar_triagem)
+            stats_triagem = await asyncio.to_thread(executar_triagem)
             
             await enviar_alertas_urgentes_agora(ids_pendentes)
             await enviar_digest_noticias(ids_pendentes)
-            await enviar_log_discord(f"Varredura social concluída. **{novas_social}** novos posts coletados e triados.", "Varredura Social Concluída")
+            
+            msg_log = f"**📱 Social:** {novas_social} novos posts coletados\n\n**🧠 Triagem da IA:**\n✅ {stats_triagem.get('avaliadas', 0)} avaliados com sucesso\n❌ {stats_triagem.get('erros', 0)} falhas/erros\n🚨 {stats_triagem.get('urgentes', 0)} urgentes"
+            await enviar_log_discord(msg_log, "Resumo da Varredura Social")
         else:
             print("[AUTO-SOCIAL] Nenhuma postagem nova encontrada.", flush=True)
-            await enviar_log_discord("Varredura social executada. Nenhum post novo encontrado.", "Varredura Social Concluída")
+            await enviar_log_discord("**📱 Social:** 0 posts novos coletados.", "Resumo da Varredura Social")
             
     except Exception as e:
         print(f"[ERRO] varredura_social_diaria: {e}")

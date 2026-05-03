@@ -257,7 +257,7 @@ def executar_triagem():
     if total == 0:
         print("📭 Nenhuma notícia pendente de avaliação encontrada.")
         print("   Execute o scraper.py primeiro para popular o banco.")
-        return
+        return {"total": 0, "avaliadas": 0, "erros": 0, "urgentes": 0}
 
     print(f"📋 {total} notícias pendentes encontradas. Iniciando triagem...\n")
 
@@ -345,6 +345,13 @@ def executar_triagem():
             print(f"     {label} Nota {nota:>2}: {barra} ({quantidade})")
 
     print("=" * 60)
+    
+    return {
+        "total": total,
+        "avaliadas": avaliadas,
+        "erros": erros,
+        "urgentes": alertas_urgentes
+    }
 
 
 # =============================================

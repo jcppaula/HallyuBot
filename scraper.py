@@ -20,6 +20,8 @@ import time
 import random
 import requests
 from datetime import datetime
+from urllib.parse import urljoin
+from bs4 import BeautifulSoup
 
 # Corrige encoding do terminal no Windows (suporte a emojis e acentos)
 sys.stdout.reconfigure(encoding="utf-8")
@@ -92,6 +94,7 @@ FONTES_RSS = [
             "https://dramapanda.com/feed/",
             "https://www.dramapanda.com/feed/",
         ],
+        "html_fallback": "https://dramapanda.com/",
         "pilar": "Cultura Chinesa"
     },
     {
@@ -127,6 +130,39 @@ def baixar_e_parsear_feed(url_feed):
     resposta = requests.get(url_feed, headers=HEADERS_RSS, timeout=20)
     resposta.raise_for_status()
     return feedparser.parse(resposta.content)
+
+
+def coletar_home_html(url_home, nome_fonte, pilar, limite=20):
+    """Extrai noticias da pagina inicial quando o RSS da fonte falha."""
+    resposta = requests.get(url_home, headers=HEADERS_RSS, timeout=20)
+    resposta.raise_for_status()
+
+    soup = BeautifulSoup(resposta.text, "html.parser")
+    noticias = []
+    vistos = set()
+
+    for link_tag in soup.select("h1 a, h2 a, h3 a, article a"):
+        titulo = link_tag.get_text(" ", strip=True)
+        link = urljoin(url_home, link_tag.get("href", "").strip())
+
+        if not titulo or not link.startswith("http"):
+            continue
+        if len(titulo) < 12 or link in vistos:
+            continue
+
+        vistos.add(link)
+        noticias.append({
+            "titulo": titulo,
+            "url": link,
+            "fonte": nome_fonte,
+            "pilar": pilar,
+            "data_publicacao": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+
+        if len(noticias) >= limite:
+            break
+
+    return noticias
 
 # =============================================
 # Fontes para Plano B (BeautifulSoup) — Implementação futura
@@ -207,6 +243,16 @@ def coletar_feed_rss(fonte):
 
         # Verifica se o feed retornou entradas válidas
         if not feed:
+            html_fallback = fonte.get("html_fallback")
+            if html_fallback:
+                try:
+                    noticias_html = coletar_home_html(html_fallback, nome_fonte, pilar)
+                    if noticias_html:
+                        print(f"✅ {len(noticias_html)} entradas encontradas (HTML fallback).")
+                        return noticias_html
+                except Exception as e:
+                    ultimo_erro = e
+
             detalhe = str(ultimo_erro)[:120] if ultimo_erro else "sem detalhe"
             print(f"⚠️  Feed com problemas ou inacessível ({detalhe}).")
             return noticias
