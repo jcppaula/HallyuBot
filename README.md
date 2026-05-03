@@ -16,42 +16,75 @@ O **HallyuBot** é um bot de Discord autônomo que atua como um **Editor-Chefe i
 
 ---
 
-## 🚀 Quick Start (Como rodar localmente)
+## 🚀 Como Rodar o HallyuBot (3 Opções)
 
-### 1. Clonar e Instalar Dependências
-```bash
-git clone https://github.com/SEU-USUARIO/HallyuBot.git
-cd HallyuBot
+Você pode rodar este bot no seu próprio computador ou deixá-lo 24/7 na nuvem. Siga o guia que melhor se adapta à sua necessidade:
 
-# Crie um ambiente virtual (opcional, mas recomendado)
-python -m venv venv
-# No Windows:
-venv\Scripts\activate
-# No Mac/Linux:
-source venv/bin/activate
+### Opção 1: Rodar Localmente (No seu PC para testes)
+Ideal para desenvolver, testar ou deixar rodando num computador que não desliga na sua casa.
 
-# Instale os requisitos
-pip install -r requirements.txt
-```
+1. **Clone o repositório:**
+   ```bash
+   git clone https://github.com/SEU-USUARIO/HallyuBot.git
+   cd HallyuBot
+   ```
+2. **Crie o ambiente e instale as dependências:**
+   ```bash
+   python -m venv venv
+   # No Windows:
+   venv\Scripts\activate
+   # No Mac/Linux:
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+3. **Configure as senhas:**
+   Copie o arquivo `.env.example` para `.env` e preencha suas chaves (Discord, OpenAI, Apify, YouTube).
+4. **Ligue o Bot:**
+   ```bash
+   python main.py
+   ```
 
-### 2. Configurar Variáveis de Ambiente
-Renomeie o arquivo `.env.example` para `.env` e preencha com suas chaves:
-```bash
-cp .env.example .env
-```
+---
 
-No arquivo `.env`, você precisará das seguintes credenciais:
-- `DISCORD_TOKEN`: O token do seu bot criado no Discord Developer Portal.
-- `CANAL_URGENTE_ID` / `CANAL_RESUMO_ID`: IDs dos canais de texto do seu servidor.
-- `OPENAI_API_KEY`: Para o cérebro do Editor-Chefe e Roteirista (GPT-4o-mini).
-- `APIFY_API_TOKEN`: Para capturar o TikTok e Instagram (plano gratuito da Apify serve).
-- `YOUTUBE_API_KEY`: API Oficial do Google (YouTube Data API v3).
+### Opção 2: Rodar na Railway (Nuvem "Mágica" / Fácil)
+A [Railway](https://railway.com/) é a plataforma mais fácil para hospedar bots. Ela custa ~$5/mês e o deploy é automático via GitHub.
 
-### 3. Iniciar o Bot
-```bash
-python main.py
-```
-Se for a primeira vez, ele criará o banco de dados `hallyubot.db` automaticamente dentro da pasta `data/`.
+1. Faça login na Railway com seu GitHub.
+2. Clique em **New Project** > **Deploy from GitHub repo** e selecione o `HallyuBot`.
+3. Na aba **Variables**, adicione todas as chaves que estariam no seu `.env` (`DISCORD_TOKEN`, `OPENAI_API_KEY`, etc).
+4. **⚠️ CRÍTICO:** Para não perder o banco de dados quando o bot reiniciar, vá na aba **Volumes**, crie um "Persistent Volume" e monte ele no caminho `/app/data` (ou a pasta local onde o `hallyubot.db` é criado).
+5. O bot vai subir sozinho e atualizar automaticamente sempre que você fizer um `git push` no GitHub.
+
+---
+
+### Opção 3: Rodar numa VPS Clássica (ex: Hostinger / Ubuntu)
+A [Hostinger KVM](https://www.hostinger.com/br/servidor-vps) oferece servidores Linux raiz a partir de ~R$ 30/mês. É a melhor opção se você quiser ter os arquivos físicos na sua máquina sem risco de exclusão por restarts.
+
+1. Acesse sua VPS via SSH:
+   ```bash
+   ssh root@IP_DA_SUA_VPS
+   ```
+2. Instale o Python e baixe o seu código:
+   ```bash
+   sudo apt update && sudo apt install python3 python3-venv git npm -y
+   git clone https://github.com/SEU-USUARIO/HallyuBot.git
+   cd HallyuBot
+   ```
+3. Configure o bot:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   cp .env.example .env
+   nano .env  # Preencha suas senhas e salve (Ctrl+X, Y, Enter)
+   ```
+4. Mantenha o bot vivo para sempre com o **PM2**:
+   ```bash
+   sudo npm install pm2 -g
+   pm2 start main.py --name "HallyuBot" --interpreter ./venv/bin/python
+   pm2 save
+   pm2 startup
+   ```
 
 ---
 
