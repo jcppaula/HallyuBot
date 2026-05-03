@@ -963,6 +963,11 @@ async def comando_triar(interaction: discord.Interaction):
             await interaction.followup.send("OPENAI_API_KEY nao configurada."); return
         from ai_triagem import executar_triagem
         await asyncio.to_thread(executar_triagem)
+        
+        # Envia os alertas para o Discord imediatamente após a triagem manual
+        await enviar_alertas_urgentes_agora()
+        await enviar_digest_noticias()
+
         contagens = contar_noticias_por_status()
         embed = discord.Embed(title="Triagem Concluida", color=COR_TRIAR, timestamp=datetime.now())
         embed.add_field(name="Avaliadas", value=f"**{contagens.get('avaliada',0)}**", inline=True)
