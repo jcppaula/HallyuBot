@@ -19,6 +19,8 @@ load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 CANAL_URGENTE_ID = os.getenv("CANAL_URGENTE_ID")
 CANAL_RESUMO_ID = os.getenv("CANAL_RESUMO_ID")
+CANAL_LOGS_ID = os.getenv("CANAL_LOGS_ID")
+ADMIN_USER_ID = os.getenv("ADMIN_USER_ID")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 CAMINHO_BD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "hallyubot.db")
 CAMINHO_TEMPLATES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", "Templates_Validados_V2.md")
@@ -500,6 +502,20 @@ async def monitor_plantao():
 async def antes_monitor():
     await client.wait_until_ready()
 
+async def enviar_log_discord(mensagem, titulo="Log do Sistema", cor=COR_STATUS, erro=False):
+    """Envia uma mensagem de log para o canal de logs e marca o admin se for erro."""
+    try:
+        if not CANAL_LOGS_ID: return
+        canal = client.get_channel(int(CANAL_LOGS_ID))
+        if not canal: return
+        
+        embed = discord.Embed(title=titulo, description=mensagem[:4000], color=0xFF0000 if erro else cor, timestamp=datetime.now())
+        content = f"<@{ADMIN_USER_ID}>" if erro and ADMIN_USER_ID else ""
+        
+        await canal.send(content=content, embed=embed)
+    except Exception as e:
+        print(f"[ERRO] falha ao enviar log pro discord: {e}")
+
 # =============================================
 # Loop Automatico: Varredura + Triagem (a cada 2h)
 # =============================================
@@ -537,9 +553,13 @@ async def varredura_automatica():
 
         # Limpeza periodica
         limpar_banco_antigo(dias=15)
+        
+        if novas_rss > 0:
+            await enviar_log_discord(f"Varredura concluída. **{novas_rss}** novas notícias coletadas e triadas.\nDuplicadas ignoradas: {ign_rss}", "Varredura RSS Concluída")
 
     except Exception as e:
         print(f"[ERRO] varredura_automatica: {e}", flush=True)
+        await enviar_log_discord(f"Ocorreu um erro durante a varredura automática (RSS):\n```\n{str(e)}\n```", "Erro na Varredura Automática", erro=True)
 
 @varredura_automatica.before_loop
 async def antes_varredura():
@@ -582,11 +602,14 @@ async def varredura_social_diaria():
             
             await enviar_alertas_urgentes_agora(ids_pendentes)
             await enviar_digest_noticias(ids_pendentes)
+            await enviar_log_discord(f"Varredura social concluída. **{novas_social}** novos posts coletados e triados.", "Varredura Social Concluída")
         else:
             print("[AUTO-SOCIAL] Nenhuma postagem nova encontrada.", flush=True)
+            await enviar_log_discord("Varredura social executada. Nenhum post novo encontrado.", "Varredura Social Concluída")
             
     except Exception as e:
         print(f"[ERRO] varredura_social_diaria: {e}")
+        await enviar_log_discord(f"Ocorreu um erro durante a varredura social:\n```\n{str(e)}\n```", "Erro na Varredura Social", erro=True)
 
 @varredura_social_diaria.before_loop
 async def antes_social():
