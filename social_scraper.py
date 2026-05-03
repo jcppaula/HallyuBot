@@ -55,9 +55,8 @@ def varrer_instagram():
         try:
             # Actor: apify/instagram-post-scraper (busca posts de perfil)
             run_input = {
-                "directUrls": [f"https://www.instagram.com/{conta}/"],
+                "username": [conta],
                 "resultsLimit": 1,
-                "resultsType": "posts",
             }
             run = client.actor("apify/instagram-post-scraper").call(run_input=run_input, timeout_secs=120)
             items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
