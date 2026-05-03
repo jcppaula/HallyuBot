@@ -1,0 +1,23 @@
+# Variáveis de ambiente (NUNCA versionar!)
+.env
+
+# Banco de dados local
+*.db
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+
+# Sistema operacional
+Thumbs.db
+.DS_Store
