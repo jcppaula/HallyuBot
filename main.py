@@ -497,22 +497,9 @@ async def varredura_automatica():
         novas_rss, ign_rss = await asyncio.to_thread(varrer_noticias)
         print(f"[AUTO-RSS] {novas_rss} novas | {ign_rss} duplicadas", flush=True)
 
-        # Fase 2: Varrer redes sociais (1x por dia)
-        novas_social = 0
-        try:
-            from social_scraper import varrer_social
-            resultado_social = await asyncio.to_thread(varrer_social, False)  # forcar=False respeita trava diaria
-            if resultado_social:
-                for plat in ["instagram", "tiktok", "youtube"]:
-                    novas_social += resultado_social.get(plat, {}).get("novas", 0)
-                print(f"[AUTO-SOCIAL] {novas_social} novos posts sociais", flush=True)
-        except Exception as e:
-            print(f"[AUTO-SOCIAL] Erro (nao-critico): {e}", flush=True)
-
         # Fase 3: Triagem com IA (se ha pendentes)
-        total_novas = novas_rss + novas_social
-        if total_novas > 0:
-            print(f"[AUTO-TRIAGEM] {total_novas} noticias novas, iniciando triagem com IA...", flush=True)
+        if novas_rss > 0:
+            print(f"[AUTO-TRIAGEM] {novas_rss} noticias novas (RSS), iniciando triagem com IA...", flush=True)
             # Pequena pausa para o banco estabilizar
             await asyncio.sleep(5)
             from ai_triagem import executar_triagem
@@ -534,7 +521,54 @@ async def varredura_automatica():
         print(f"[ERRO] varredura_automatica: {e}", flush=True)
 
 @varredura_automatica.before_loop
-async def antes_varredura_auto():
+async def antes_varredura():
+    await client.wait_until_ready()
+
+# =============================================
+# Loop Automatico: Redes Sociais (Horario Fixo)
+# =============================================
+
+import datetime
+# Define o horario que vai rodar. Ex: 10:00 e 18:00 no fuso de Brasilia (UTC-3)
+fuso_br = datetime.timezone(datetime.timedelta(hours=-3))
+HORARIOS_SOCIAL = [
+    datetime.time(hour=10, minute=0, tzinfo=fuso_br),
+    datetime.time(hour=18, minute=0, tzinfo=fuso_br)
+]
+
+@tasks.loop(time=HORARIOS_SOCIAL)
+async def varredura_social_diaria():
+    """Varre as redes sociais em horarios fixos do dia."""
+    try:
+        print(f"\n{'='*60}", flush=True)
+        print(f"[AUTO-SOCIAL] Varredura FIXA de Redes Sociais — {datetime.now().strftime('%H:%M:%S')}", flush=True)
+        print(f"{'='*60}", flush=True)
+
+        from social_scraper import varrer_social
+        # forcar=True para ignorar a trava antiga baseada em arquivo
+        resultado_social = await asyncio.to_thread(varrer_social, True)
+        
+        novas_social = 0
+        if resultado_social:
+            for plat in ["instagram", "tiktok", "youtube"]:
+                novas_social += resultado_social.get(plat, {}).get("novas", 0)
+            
+        if novas_social > 0:
+            print(f"[AUTO-SOCIAL] {novas_social} novos posts sociais. Iniciando IA...", flush=True)
+            await asyncio.sleep(5)
+            from ai_triagem import executar_triagem
+            await asyncio.to_thread(executar_triagem)
+            
+            await enviar_alertas_urgentes_agora()
+            await enviar_digest_noticias()
+        else:
+            print("[AUTO-SOCIAL] Nenhuma postagem nova encontrada.", flush=True)
+            
+    except Exception as e:
+        print(f"[ERRO] varredura_social_diaria: {e}")
+
+@varredura_social_diaria.before_loop
+async def antes_social():
     await client.wait_until_ready()
     # Espera 60s apos ligar para nao sobrecarregar no startup
     await asyncio.sleep(60)
@@ -963,6 +997,7 @@ async def on_ready():
     if not monitor_plantao.is_running(): monitor_plantao.start()
     if not rotacao_atividade.is_running(): rotacao_atividade.start()
     if not varredura_automatica.is_running(): varredura_automatica.start()
+    if not varredura_social_diaria.is_running(): varredura_social_diaria.start()
     await client.change_presence(activity=next(ATIVIDADES))
 
     # Limpeza automatica de noticias antigas (>15 dias)
