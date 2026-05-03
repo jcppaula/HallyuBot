@@ -20,29 +20,49 @@ O **HallyuBot** é um bot de Discord autônomo que atua como um **Editor-Chefe i
 
 Você pode rodar este bot no seu próprio computador ou deixá-lo 24/7 na nuvem. Siga o guia que melhor se adapta à sua necessidade:
 
-### Opção 1: Rodar Localmente (No seu PC para testes)
-Ideal para desenvolver, testar ou deixar rodando num computador que não desliga na sua casa.
+### Opção 1: Rodar Localmente (Passo a Passo para Iniciantes)
+Ideal para deixar rodando num computador de casa. Este guia foi feito para qualquer pessoa conseguir ligar o bot, mesmo sem experiência com programação.
 
-1. **Clone o repositório:**
+**Passo A: Preparando o Computador (Só a primeira vez)**
+1. **Baixe o Python:** Entre no site [python.org/downloads](https://www.python.org/downloads/) e instale a versão mais recente. 
+   > ⚠️ **MUITO IMPORTANTE:** Durante a instalação, logo na primeira tela, marque a caixinha **"Add python.exe to PATH"** antes de clicar em Install Now. Se não marcar isso, nada vai funcionar!
+2. **Baixe o Git:** Entre em [git-scm.com](https://git-scm.com/downloads) e instale (pode só ir clicando em "Next" até o final).
+
+**Passo B: Baixando o Bot**
+1. Crie uma pasta vazia no seu computador (ex: `Area de Trabalho\HallyuBot`).
+2. Abra o terminal (no Windows, clique em Iniciar, digite `cmd` e aperte Enter).
+3. No terminal, digite os comandos abaixo apertando Enter após cada um:
    ```bash
+   # Baixar o código do robô
    git clone https://github.com/SEU-USUARIO/HallyuBot.git
+   
+   # Entrar na pasta do robô
    cd HallyuBot
    ```
-2. **Crie o ambiente e instale as dependências:**
+
+**Passo C: Configurando as Senhas e Dependências**
+1. Com o terminal ainda aberto, crie e ative a bolha do robô (ambiente virtual):
    ```bash
    python -m venv venv
-   # No Windows:
+   # Se for Windows, ative com:
    venv\Scripts\activate
-   # No Mac/Linux:
+   # Se for Mac/Linux, ative com:
    source venv/bin/activate
+   ```
+2. Instale o "cérebro" e as ferramentas do robô:
+   ```bash
    pip install -r requirements.txt
    ```
-3. **Configure as senhas:**
-   Copie o arquivo `.env.example` para `.env` e preencha suas chaves (Discord, OpenAI, Apify, YouTube).
-4. **Ligue o Bot:**
+3. Abra a pasta do robô pelo explorador de arquivos normal do Windows. Você verá um arquivo chamado `.env.example`.
+4. Renomeie esse arquivo para `.env` (remova o `.example`).
+5. Abra esse arquivo `.env` com o Bloco de Notas e preencha as suas senhas (Discord, OpenAI, Apify, YouTube). Salve e feche.
+
+**Passo D: Ligando o Robô**
+1. Volte pro terminal (certifique-se de que o `(venv)` está escrito no começo da linha) e digite:
    ```bash
    python main.py
    ```
+Pronto! O robô vai ligar, criar o banco de dados sozinho e começar a varrer as notícias. Enquanto essa tela preta estiver aberta, o robô estará vivo.
 
 ---
 
