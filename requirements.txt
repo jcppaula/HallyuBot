@@ -27,4 +27,4 @@ openai>=1.0.0
 google-api-python-client>=2.100.0
 
 # Cliente HTTP para Apify API (Instagram/TikTok)
-# (usa 'requests' já listado acima)
+apify-client>=1.6.0
