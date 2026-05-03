@@ -528,11 +528,11 @@ async def antes_varredura():
 # Loop Automatico: Redes Sociais (Horario Fixo)
 # =============================================
 
-import datetime
+import datetime as dt
 # Define o horario que vai rodar. Ex: 07:00 da manha no fuso de Brasilia (UTC-3)
-fuso_br = datetime.timezone(datetime.timedelta(hours=-3))
+fuso_br = dt.timezone(dt.timedelta(hours=-3))
 HORARIOS_SOCIAL = [
-    datetime.time(hour=7, minute=0, tzinfo=fuso_br)
+    dt.time(hour=7, minute=0, tzinfo=fuso_br)
 ]
 
 @tasks.loop(time=HORARIOS_SOCIAL)
