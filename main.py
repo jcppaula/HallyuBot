@@ -507,7 +507,12 @@ async def enviar_log_discord(mensagem, titulo="Log do Sistema", cor=COR_STATUS, 
     try:
         if not CANAL_LOGS_ID: return
         canal = client.get_channel(int(CANAL_LOGS_ID))
-        if not canal: return
+        if not canal:
+            try:
+                canal = await client.fetch_channel(int(CANAL_LOGS_ID))
+            except Exception as e:
+                print(f"[AVISO] canal de logs nao encontrado: {e}")
+                return
         
         embed = discord.Embed(title=titulo, description=mensagem[:4000], color=0xFF0000 if erro else cor, timestamp=datetime.now())
         content = f"<@{ADMIN_USER_ID}>" if erro and ADMIN_USER_ID else ""
@@ -554,8 +559,7 @@ async def varredura_automatica():
         # Limpeza periodica
         limpar_banco_antigo(dias=15)
         
-        if novas_rss > 0:
-            await enviar_log_discord(f"Varredura concluída. **{novas_rss}** novas notícias coletadas e triadas.\nDuplicadas ignoradas: {ign_rss}", "Varredura RSS Concluída")
+        await enviar_log_discord(f"Varredura concluída. **{novas_rss}** novas notícias coletadas.\nDuplicadas ignoradas: {ign_rss}", "Varredura RSS Concluída")
 
     except Exception as e:
         print(f"[ERRO] varredura_automatica: {e}", flush=True)
