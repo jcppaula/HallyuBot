@@ -56,10 +56,18 @@ ATIVIDADES = itertools.cycle([
 # Funcoes de Banco de Dados
 # =============================================
 
-def buscar_alertas_urgentes():
+def buscar_alertas_urgentes(ids_permitidos=None):
     try:
         con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        cur.execute("SELECT id, titulo, url, temperatura, justificativa, pilar, resumo FROM noticias WHERE status='avaliada' AND temperatura>=9 ORDER BY temperatura DESC")
+        params = []
+        filtro_ids = ""
+        if ids_permitidos is not None:
+            if not ids_permitidos:
+                con.close(); return []
+            placeholders = ",".join("?" for _ in ids_permitidos)
+            filtro_ids = f" AND id IN ({placeholders})"
+            params.extend(ids_permitidos)
+        cur.execute(f"SELECT id, titulo, url, temperatura, justificativa, pilar, resumo FROM noticias WHERE status='avaliada' AND temperatura>=9{filtro_ids} ORDER BY temperatura DESC", params)
         r = cur.fetchall(); con.close(); return r
     except Exception as e:
         print(f"[ERRO] buscar_alertas: {e}"); return []
@@ -100,6 +108,16 @@ def atualizar_status(noticia_id, novo_status):
         con.commit(); con.close()
     except Exception as e:
         print(f"[ERRO] atualizar_status: {e}")
+
+def buscar_ids_pendentes_triagem():
+    """Retorna os IDs pendentes antes de uma triagem manual."""
+    try:
+        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
+        cur.execute("SELECT id FROM noticias WHERE status='pendente_avaliacao'")
+        ids = [r[0] for r in cur.fetchall()]
+        con.close(); return ids
+    except Exception as e:
+        print(f"[ERRO] buscar_ids_pendentes: {e}"); return []
 
 def contar_noticias_por_status():
     try:
@@ -505,14 +523,15 @@ async def varredura_automatica():
             # Pequena pausa para o banco estabilizar
             await asyncio.sleep(5)
             from ai_triagem import executar_triagem
+            ids_pendentes = buscar_ids_pendentes_triagem()
             await asyncio.to_thread(executar_triagem)
             print(f"[AUTO-TRIAGEM] Concluida.", flush=True)
 
             # Fase 4: Enviar alertas URGENTES (nota 9-10) IMEDIATAMENTE com botoes
-            await enviar_alertas_urgentes_agora()
+            await enviar_alertas_urgentes_agora(ids_pendentes)
 
             # Fase 5: Enviar digest das noticias avaliadas (nota 5-8) com botoes
-            await enviar_digest_noticias()
+            await enviar_digest_noticias(ids_pendentes)
         else:
             print(f"[AUTO] Nenhuma noticia nova. Proxima varredura em 2h.", flush=True)
 
@@ -558,10 +577,11 @@ async def varredura_social_diaria():
             print(f"[AUTO-SOCIAL] {novas_social} novos posts sociais. Iniciando IA...", flush=True)
             await asyncio.sleep(5)
             from ai_triagem import executar_triagem
+            ids_pendentes = buscar_ids_pendentes_triagem()
             await asyncio.to_thread(executar_triagem)
             
-            await enviar_alertas_urgentes_agora()
-            await enviar_digest_noticias()
+            await enviar_alertas_urgentes_agora(ids_pendentes)
+            await enviar_digest_noticias(ids_pendentes)
         else:
             print("[AUTO-SOCIAL] Nenhuma postagem nova encontrada.", flush=True)
             
@@ -575,14 +595,14 @@ async def antes_social():
     await asyncio.sleep(60)
 
 
-async def enviar_alertas_urgentes_agora():
+async def enviar_alertas_urgentes_agora(ids_permitidos=None):
     """Envia alertas de noticias nota 9-10 IMEDIATAMENTE apos triagem, com botoes."""
     try:
         if not CANAL_URGENTE_ID: return
         canal = client.get_channel(int(CANAL_URGENTE_ID))
         if not canal: return
 
-        alertas = buscar_alertas_urgentes()
+        alertas = buscar_alertas_urgentes(ids_permitidos)
         if not alertas:
             print("[AUTO-URGENTE] Sem alertas urgentes nesta rodada.", flush=True)
             return
@@ -620,7 +640,7 @@ async def enviar_alertas_urgentes_agora():
         print(f"[ERRO] alertas_urgentes_agora: {e}", flush=True)
 
 
-async def enviar_digest_noticias():
+async def enviar_digest_noticias(ids_permitidos=None):
     """Envia noticias recém-avaliadas (nota 5-8) no canal de resumo com botoes."""
     try:
         canal_id = CANAL_RESUMO_ID or CANAL_URGENTE_ID
@@ -630,13 +650,21 @@ async def enviar_digest_noticias():
 
         # Busca noticias avaliadas com nota 5-8 que ainda nao foram enviadas
         con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        cur.execute("""
+        params = []
+        filtro_ids = ""
+        if ids_permitidos is not None:
+            if not ids_permitidos:
+                con.close(); return
+            placeholders = ",".join("?" for _ in ids_permitidos)
+            filtro_ids = f" AND id IN ({placeholders})"
+            params.extend(ids_permitidos)
+        cur.execute(f"""
             SELECT id, titulo, url, temperatura, justificativa, pilar, fonte, resumo
             FROM noticias
-            WHERE status = 'avaliada' AND temperatura BETWEEN 5 AND 8
+            WHERE status = 'avaliada' AND temperatura BETWEEN 5 AND 8{filtro_ids}
             ORDER BY temperatura DESC, data_coleta DESC
             LIMIT 10
-        """)
+        """, params)
         noticias = cur.fetchall(); con.close()
 
         if not noticias:
@@ -962,11 +990,13 @@ async def comando_triar(interaction: discord.Interaction):
         if not OPENAI_API_KEY:
             await interaction.followup.send("OPENAI_API_KEY nao configurada."); return
         from ai_triagem import executar_triagem
+        ids_pendentes = buscar_ids_pendentes_triagem()
         await asyncio.to_thread(executar_triagem)
         
-        # Envia os alertas para o Discord imediatamente após a triagem manual
-        await enviar_alertas_urgentes_agora()
-        await enviar_digest_noticias()
+        # Envia apenas itens que estavam pendentes nesta triagem manual.
+        if ids_pendentes:
+            await enviar_alertas_urgentes_agora(ids_pendentes)
+            await enviar_digest_noticias(ids_pendentes)
 
         contagens = contar_noticias_por_status()
         embed = discord.Embed(title="Triagem Concluida", color=COR_TRIAR, timestamp=datetime.now())

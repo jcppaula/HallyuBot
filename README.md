@@ -9,8 +9,8 @@ O **HallyuBot** é um bot de Discord autônomo que atua como um **Editor-Chefe i
 - **📡 Radar de Notícias (RSS & Scraping):** Varre automaticamente (a cada 2h) sites como Soompi, Koreaboo e Reddit.
 - **📱 Sensores Sociais:** Integração com Apify e YouTube Data API v3 para monitorar Instagram, TikTok e YouTube (1x ao dia).
 - **🧠 Triagem Inteligente:** Toda nova postagem passa pela OpenAI (GPT-4o-mini) para avaliar a relevância (1 a 10) com base no potencial de viralização.
-- **🚨 Plantão Urgente Automático:** Notícias nota 9-10 (escândalos, disbands, mortes) disparam um alerta imediato com `@everyone` ou `@here`.
-- **📋 Digest Interativo:** Notícias nota 5-8 são agrupadas num resumo periódico no Discord.
+- **🚨 Plantão Urgente Automático:** Notícias nota 9-10 disparam um alerta imediato com `@everyone` ou `@here`, contendo um resumo em texto gerado pela IA.
+- **📋 Digest Interativo:** Notícias nota 5-8 são agrupadas num resumo periódico no Discord, também incluindo resumos práticos.
 - **📝 Geração de Roteiros (1 Clique):** Todas as notificações possuem um botão interativo do Discord. Basta clicar em "📝 Fazer Roteiro" e a IA redige um texto pronto (com Call To Action e ganchos) baseado em templates validados.
 - **💡 Motor de Ideias:** Comando `/ideia` para gerar ganchos virais para o TikTok/Reels quando o noticiário estiver calmo.
 
@@ -20,8 +20,8 @@ O **HallyuBot** é um bot de Discord autônomo que atua como um **Editor-Chefe i
 
 Você pode rodar este bot no seu próprio computador ou deixá-lo 24/7 na nuvem. Siga o guia que melhor se adapta à sua necessidade:
 
-### Opção 1: Rodar Localmente (Passo a Passo para Iniciantes)
-Ideal para deixar rodando num computador de casa. Este guia foi feito para qualquer pessoa conseguir ligar o bot, mesmo sem experiência com programação.
+### Opção 1: Rodar Localmente (Passo a Passo para Windows 11)
+Ideal para deixar rodando num computador de casa. Este guia foi feito para qualquer pessoa conseguir ligar o bot no Windows 11, mesmo sem experiência com programação.
 
 **Passo A: Preparando o Computador (Só a primeira vez)**
 1. **Baixe o Python:** Entre no site [python.org/downloads](https://www.python.org/downloads/) e instale a versão mais recente. 
@@ -29,40 +29,23 @@ Ideal para deixar rodando num computador de casa. Este guia foi feito para qualq
 2. **Baixe o Git:** Entre em [git-scm.com](https://git-scm.com/downloads) e instale (pode só ir clicando em "Next" até o final).
 
 **Passo B: Baixando o Bot**
-1. Crie uma pasta vazia no seu computador (ex: `Area de Trabalho\HallyuBot`).
-2. Abra o terminal (no Windows, clique em Iniciar, digite `cmd` e aperte Enter).
-3. No terminal, digite os comandos abaixo apertando Enter após cada um:
+1. Crie uma pasta vazia no seu computador (ex: `C:\HallyuBot`).
+2. Clique com o botão direito dentro da pasta vazia e escolha **"Abrir no Terminal"** ou abra o Prompt de Comando (`cmd`).
+3. Digite o comando abaixo e aperte Enter:
    ```bash
-   # Baixar o código do robô
-   git clone https://github.com/SEU-USUARIO/HallyuBot.git
+   git clone https://github.com/SEU-USUARIO/HallyuBot.git .
+   ```
+
+**Passo C: Configurando as Senhas**
+1. Abra a pasta do robô pelo explorador de arquivos do Windows 11. Você verá um arquivo chamado `.env.example`.
+2. Renomeie esse arquivo para `.env` (remova o `.example`).
+3. Abra esse arquivo `.env` com o Bloco de Notas e preencha as suas senhas (Discord, OpenAI, Apify, YouTube). Salve e feche.
+
+**Passo D: Ligando o Robô (1 Clique)**
+1. Na pasta do robô, você verá um arquivo chamado **`iniciar_bot.bat`**.
+2. Dê dois cliques nele!
    
-   # Entrar na pasta do robô
-   cd HallyuBot
-   ```
-
-**Passo C: Configurando as Senhas e Dependências**
-1. Com o terminal ainda aberto, crie e ative a bolha do robô (ambiente virtual):
-   ```bash
-   python -m venv venv
-   # Se for Windows, ative com:
-   venv\Scripts\activate
-   # Se for Mac/Linux, ative com:
-   source venv/bin/activate
-   ```
-2. Instale o "cérebro" e as ferramentas do robô:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Abra a pasta do robô pelo explorador de arquivos normal do Windows. Você verá um arquivo chamado `.env.example`.
-4. Renomeie esse arquivo para `.env` (remova o `.example`).
-5. Abra esse arquivo `.env` com o Bloco de Notas e preencha as suas senhas (Discord, OpenAI, Apify, YouTube). Salve e feche.
-
-**Passo D: Ligando o Robô**
-1. Volte pro terminal (certifique-se de que o `(venv)` está escrito no começo da linha) e digite:
-   ```bash
-   python main.py
-   ```
-Pronto! O robô vai ligar, criar o banco de dados sozinho e começar a varrer as notícias. Enquanto essa tela preta estiver aberta, o robô estará vivo.
+O que ele faz automaticamente: baixa atualizações do GitHub, cria o ambiente virtual (venv), instala todas as dependências (`apify-client`, `discord.py`, etc) e liga o bot. Enquanto a telinha preta estiver aberta, o HallyuBot estará operando. Sempre que quiser ligar o bot no futuro, basta usar esse mesmo arquivo!
 
 ---
 
@@ -117,7 +100,7 @@ Embora o bot opere com laços 100% autônomos de varredura e triagem em backgrou
 | `/status` | Exibe o painel de saúde (quantas notícias na base, taxa de aproveitamento, sensores sociais). |
 | `/varrer` | Força uma varredura manual de todos os feeds RSS cadastrados. |
 | `/social` | Força uma varredura manual dos perfis (IG, TT, YT) ignorando a trava de 1x/dia. |
-| `/triar` | Passa todas as notícias pendentes pela avaliação da IA. |
+| `/triar` | Passa todas as notícias pendentes pela avaliação da IA e dispara os resumos imediatamente no Discord. |
 | `/roteiro`| Pega as 3 melhores notícias (nota 5+) não utilizadas nas últimas 48h e gera roteiros. |
 | `/ideia` | Gera 3 ideias/formatos de vídeos virais baseados em tendências do nicho. |
 | `/analisar`| (Requer Link/Texto) Analisa manualmente qualquer fofoca avulsa que você enviar. |
