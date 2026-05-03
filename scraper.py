@@ -19,9 +19,16 @@ import sys
 import time
 import random
 import requests
+import urllib.request
 from datetime import datetime
+from html import unescape
 from urllib.parse import urljoin
-from bs4 import BeautifulSoup
+from html.parser import HTMLParser
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 # Corrige encoding do terminal no Windows (suporte a emojis e acentos)
 sys.stdout.reconfigure(encoding="utf-8")
@@ -89,11 +96,12 @@ FONTES_RSS = [
     # --- PILAR 3: Cultura Chinesa (C-Dramas/C-Pop) ---
     {
         "nome": "DramaPanda",
-        "url": "https://dramapanda.com/feed",
+        "url": "https://dramapanda.com/?feed=rss2",
         "fallbacks": [
-            "https://dramapanda.com/feed/",
-            "https://www.dramapanda.com/feed/",
+            "https://dramapanda.com/feed/?alt=rss",
+            "https://dramapanda.com/?feed=atom",
         ],
+        "wp_json_fallback": "https://dramapanda.com/wp-json/wp/v2/posts?per_page=20",
         "html_fallback": "https://dramapanda.com/",
         "pilar": "Cultura Chinesa"
     },
@@ -115,7 +123,6 @@ FONTES_RSS = [
 
 HEADERS_RSS = {
     "User-Agent": (
-        "HallyuBot/3.0 (+https://github.com/) "
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
@@ -124,12 +131,51 @@ HEADERS_RSS = {
     "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8,pt;q=0.7",
 }
 
+HEADERS_MINIMOS = {
+    "User-Agent": "Mozilla/5.0",
+    "Accept": "*/*",
+}
+
 
 def baixar_e_parsear_feed(url_feed):
     """Baixa o RSS com headers completos e devolve o objeto parseado."""
-    resposta = requests.get(url_feed, headers=HEADERS_RSS, timeout=20)
-    resposta.raise_for_status()
-    return feedparser.parse(resposta.content)
+    try:
+        resposta = requests.get(url_feed, headers=HEADERS_RSS, timeout=20)
+        resposta.raise_for_status()
+        return feedparser.parse(resposta.content)
+    except Exception:
+        req = urllib.request.Request(url_feed, headers=HEADERS_MINIMOS)
+        with urllib.request.urlopen(req, timeout=20) as resposta:
+            return feedparser.parse(resposta.read())
+
+
+class LinkHTMLParser(HTMLParser):
+    """Parser simples para coletar links quando BeautifulSoup nao estiver instalado."""
+    def __init__(self):
+        super().__init__()
+        self.links = []
+        self._href_atual = None
+        self._texto_atual = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "a":
+            return
+        attrs_dict = dict(attrs)
+        href = attrs_dict.get("href")
+        if href:
+            self._href_atual = href
+            self._texto_atual = []
+
+    def handle_data(self, data):
+        if self._href_atual:
+            self._texto_atual.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == "a" and self._href_atual:
+            texto = " ".join(t.strip() for t in self._texto_atual if t.strip())
+            self.links.append((texto, self._href_atual))
+            self._href_atual = None
+            self._texto_atual = []
 
 
 def coletar_home_html(url_home, nome_fonte, pilar, limite=20):
@@ -137,13 +183,22 @@ def coletar_home_html(url_home, nome_fonte, pilar, limite=20):
     resposta = requests.get(url_home, headers=HEADERS_RSS, timeout=20)
     resposta.raise_for_status()
 
-    soup = BeautifulSoup(resposta.text, "html.parser")
+    if BeautifulSoup:
+        soup = BeautifulSoup(resposta.text, "html.parser")
+        links = [
+            (tag.get_text(" ", strip=True), tag.get("href", "").strip())
+            for tag in soup.select("h1 a, h2 a, h3 a, article a")
+        ]
+    else:
+        parser = LinkHTMLParser()
+        parser.feed(resposta.text)
+        links = parser.links
+
     noticias = []
     vistos = set()
 
-    for link_tag in soup.select("h1 a, h2 a, h3 a, article a"):
-        titulo = link_tag.get_text(" ", strip=True)
-        link = urljoin(url_home, link_tag.get("href", "").strip())
+    for titulo, href in links:
+        link = urljoin(url_home, href.strip())
 
         if not titulo or not link.startswith("http"):
             continue
@@ -161,6 +216,38 @@ def coletar_home_html(url_home, nome_fonte, pilar, limite=20):
 
         if len(noticias) >= limite:
             break
+
+    return noticias
+
+
+def limpar_html_simples(texto):
+    """Remove tags simples de campos vindos do WordPress JSON."""
+    import re
+    return unescape(re.sub(r"<[^>]+>", "", texto or "")).strip()
+
+
+def coletar_wp_json(url_api, nome_fonte, pilar, limite=20):
+    """Extrai noticias de endpoints WordPress quando RSS/HTML falham."""
+    resposta = requests.get(url_api, headers=HEADERS_RSS, timeout=20)
+    resposta.raise_for_status()
+    posts = resposta.json()
+
+    noticias = []
+    for post in posts[:limite]:
+        titulo = limpar_html_simples(post.get("title", {}).get("rendered", ""))
+        link = post.get("link", "").strip()
+        data_pub = (post.get("date") or "")[:19].replace("T", " ")
+
+        if not titulo or not link:
+            continue
+
+        noticias.append({
+            "titulo": titulo,
+            "url": link,
+            "fonte": nome_fonte,
+            "pilar": pilar,
+            "data_publicacao": data_pub or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
 
     return noticias
 
@@ -243,6 +330,16 @@ def coletar_feed_rss(fonte):
 
         # Verifica se o feed retornou entradas válidas
         if not feed:
+            wp_json_fallback = fonte.get("wp_json_fallback")
+            if wp_json_fallback:
+                try:
+                    noticias_json = coletar_wp_json(wp_json_fallback, nome_fonte, pilar)
+                    if noticias_json:
+                        print(f"✅ {len(noticias_json)} entradas encontradas (WP JSON fallback).")
+                        return noticias_json
+                except Exception as e:
+                    ultimo_erro = e
+
             html_fallback = fonte.get("html_fallback")
             if html_fallback:
                 try:
