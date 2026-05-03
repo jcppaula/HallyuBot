@@ -529,10 +529,10 @@ async def antes_varredura():
 # =============================================
 
 import datetime
-# Define o horario que vai rodar. Ex: 08:00 da manha no fuso de Brasilia (UTC-3)
+# Define o horario que vai rodar. Ex: 07:00 da manha no fuso de Brasilia (UTC-3)
 fuso_br = datetime.timezone(datetime.timedelta(hours=-3))
 HORARIOS_SOCIAL = [
-    datetime.time(hour=8, minute=0, tzinfo=fuso_br)
+    datetime.time(hour=7, minute=0, tzinfo=fuso_br)
 ]
 
 @tasks.loop(time=HORARIOS_SOCIAL)
