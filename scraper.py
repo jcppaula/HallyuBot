@@ -148,8 +148,11 @@ def coletar_feed_rss(fonte):
     print(f"  📡 Lendo feed: {nome_fonte}...", end=" ")
 
     try:
+        # Agent customizado para evitar bloqueios 403 (ex: Reddit, Soompi)
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 HallyuBot/3.0'}
+        
         # Faz a requisição e parseia o feed RSS/Atom
-        feed = feedparser.parse(url_feed)
+        feed = feedparser.parse(url_feed, agent=headers['User-Agent'])
 
         # Verifica se o feed retornou entradas válidas
         if feed.bozo and not feed.entries:
