@@ -464,35 +464,37 @@ def salvar_no_banco(noticias):
     try:
         # Conecta no banco de dados
         conexao = sqlite3.connect(CAMINHO_BD)
-        cursor = conexao.cursor()
+        try:
+            cursor = conexao.cursor()
 
-        for noticia in noticias:
-            # INSERT OR IGNORE: se a URL já existe (UNIQUE), o registro
-            # é silenciosamente ignorado, sem gerar erro.
-            # O status recebe 'pendente_avaliacao' pois a IA ainda não processou.
-            cursor.execute("""
-                INSERT OR IGNORE INTO noticias
-                    (titulo, url, fonte, pilar, data_publicacao, status)
-                VALUES
-                    (?, ?, ?, ?, ?, 'pendente_avaliacao')
-            """, (
-                noticia["titulo"],
-                noticia["url"],
-                noticia["fonte"],
-                noticia["pilar"],
-                noticia["data_publicacao"]
-            ))
+            for noticia in noticias:
+                # INSERT OR IGNORE: se a URL já existe (UNIQUE), o registro
+                # é silenciosamente ignorado, sem gerar erro.
+                # O status recebe 'pendente_avaliacao' pois a IA ainda não processou.
+                cursor.execute("""
+                    INSERT OR IGNORE INTO noticias
+                        (titulo, url, fonte, pilar, data_publicacao, status)
+                    VALUES
+                        (?, ?, ?, ?, ?, 'pendente_avaliacao')
+                """, (
+                    noticia["titulo"],
+                    noticia["url"],
+                    noticia["fonte"],
+                    noticia["pilar"],
+                    noticia["data_publicacao"]
+                ))
 
-            # rowcount == 1 significa que a linha foi inserida (nova)
-            # rowcount == 0 significa que foi ignorada (já existia)
-            if cursor.rowcount > 0:
-                novas += 1
-            else:
-                ignoradas += 1
+                # rowcount == 1 significa que a linha foi inserida (nova)
+                # rowcount == 0 significa que foi ignorada (já existia)
+                if cursor.rowcount > 0:
+                    novas += 1
+                else:
+                    ignoradas += 1
 
-        # Salva todas as inserções no banco
-        conexao.commit()
-        conexao.close()
+            # Salva todas as inserções no banco
+            conexao.commit()
+        finally:
+            conexao.close()
 
     except Exception as e:
         print(f"  ❌ Erro ao salvar no banco: {e}")

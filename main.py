@@ -60,88 +60,110 @@ ATIVIDADES = itertools.cycle([
 
 def buscar_alertas_urgentes(ids_permitidos=None):
     try:
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        params = []
-        filtro_ids = ""
-        if ids_permitidos is not None:
-            if not ids_permitidos:
-                con.close(); return []
-            placeholders = ",".join("?" for _ in ids_permitidos)
-            filtro_ids = f" AND id IN ({placeholders})"
-            params.extend(ids_permitidos)
-        cur.execute(f"SELECT id, titulo, url, temperatura, justificativa, pilar, resumo FROM noticias WHERE status='avaliada' AND temperatura>=9{filtro_ids} ORDER BY temperatura DESC", params)
-        r = cur.fetchall(); con.close(); return r
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            params = []
+            filtro_ids = ""
+            if ids_permitidos is not None:
+                if not ids_permitidos:
+                    return []
+                placeholders = ",".join("?" for _ in ids_permitidos)
+                filtro_ids = f" AND id IN ({placeholders})"
+                params.extend(ids_permitidos)
+            cur.execute(f"SELECT id, titulo, url, temperatura, justificativa, pilar, resumo FROM noticias WHERE status='avaliada' AND temperatura>=9{filtro_ids} ORDER BY temperatura DESC", params)
+            return cur.fetchall()
+        finally:
+            con.close()
     except Exception as e:
         print(f"[ERRO] buscar_alertas: {e}"); return []
 
 def buscar_melhores_para_roteiro(limite=3):
     """Busca noticias para roteiro com filtro anti-repeticao de 48h."""
     try:
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        # Calcula o limiar de 48h atras
-        limiar_48h = (datetime.now() - timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
-        # Prioridade: notas 5-8 avaliadas, excluindo roteirizadas nas ultimas 48h
-        cur.execute("""
-            SELECT id, titulo, url, temperatura, justificativa, pilar, fonte
-            FROM noticias
-            WHERE status IN ('avaliada', 'notificada') AND temperatura BETWEEN 5 AND 8
-            ORDER BY temperatura DESC, data_coleta DESC LIMIT ?
-        """, (limite,))
-        noticias = cur.fetchall()
-        # Fallback: se nao encontrou suficientes, busca qualquer avaliada
-        if len(noticias) < limite:
-            ids_ja = [str(n[0]) for n in noticias]
-            filtro = f"AND id NOT IN ({','.join(ids_ja)})" if ids_ja else ""
-            falta = limite - len(noticias)
-            cur.execute(f"""
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            # Calcula o limiar de 48h atras
+            limiar_48h = (datetime.now() - timedelta(hours=48)).strftime("%Y-%m-%d %H:%M:%S")
+            # Prioridade: notas 5-8 avaliadas, excluindo roteirizadas nas ultimas 48h
+            cur.execute("""
                 SELECT id, titulo, url, temperatura, justificativa, pilar, fonte
-                FROM noticias WHERE status IN ('avaliada', 'notificada') {filtro}
+                FROM noticias
+                WHERE status IN ('avaliada', 'notificada') AND temperatura BETWEEN 5 AND 8
                 ORDER BY temperatura DESC, data_coleta DESC LIMIT ?
-            """, (falta,))
-            noticias.extend(cur.fetchall())
-        con.close(); return noticias
+            """, (limite,))
+            noticias = cur.fetchall()
+            # Fallback: se nao encontrou suficientes, busca qualquer avaliada
+            if len(noticias) < limite:
+                ids_ja = [str(n[0]) for n in noticias]
+                filtro = f"AND id NOT IN ({','.join(ids_ja)})" if ids_ja else ""
+                falta = limite - len(noticias)
+                cur.execute(f"""
+                    SELECT id, titulo, url, temperatura, justificativa, pilar, fonte
+                    FROM noticias WHERE status IN ('avaliada', 'notificada') {filtro}
+                    ORDER BY temperatura DESC, data_coleta DESC LIMIT ?
+                """, (falta,))
+                noticias.extend(cur.fetchall())
+            return noticias
+        finally:
+            con.close()
     except Exception as e:
         print(f"[ERRO] buscar_roteiro: {e}"); return []
 
 def atualizar_status(noticia_id, novo_status):
     try:
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        cur.execute("UPDATE noticias SET status=? WHERE id=?", (novo_status, noticia_id))
-        con.commit(); con.close()
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            cur.execute("UPDATE noticias SET status=? WHERE id=?", (novo_status, noticia_id))
+            con.commit()
+        finally:
+            con.close()
     except Exception as e:
         print(f"[ERRO] atualizar_status: {e}")
 
 def buscar_ids_pendentes_triagem():
     """Retorna os IDs pendentes antes de uma triagem manual."""
     try:
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        cur.execute("SELECT id FROM noticias WHERE status='pendente_avaliacao'")
-        ids = [r[0] for r in cur.fetchall()]
-        con.close(); return ids
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            cur.execute("SELECT id FROM noticias WHERE status='pendente_avaliacao'")
+            return [r[0] for r in cur.fetchall()]
+        finally:
+            con.close()
     except Exception as e:
         print(f"[ERRO] buscar_ids_pendentes: {e}"); return []
 
 def contar_noticias_por_status():
     try:
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        cur.execute("SELECT status, COUNT(*) FROM noticias GROUP BY status")
-        r = dict(cur.fetchall()); con.close(); return r
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            cur.execute("SELECT status, COUNT(*) FROM noticias GROUP BY status")
+            return dict(cur.fetchall())
+        finally:
+            con.close()
     except Exception as e:
         print(f"[ERRO] contar: {e}"); return {}
 
 def estatisticas_triagem_24h():
     """Retorna estatisticas de eficacia da triagem nas ultimas 24h."""
     try:
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        limiar = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
-        cur.execute("SELECT COUNT(*) FROM noticias WHERE data_coleta >= ? AND status != 'pendente_avaliacao'", (limiar,))
-        total_triadas = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM noticias WHERE data_coleta >= ? AND status != 'pendente_avaliacao' AND temperatura < 4", (limiar,))
-        descartadas = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM noticias WHERE data_coleta >= ? AND status != 'pendente_avaliacao' AND temperatura >= 4", (limiar,))
-        aproveitadas = cur.fetchone()[0]
-        con.close()
-        return {"total": total_triadas, "descartadas": descartadas, "aproveitadas": aproveitadas}
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            limiar = (datetime.now() - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
+            cur.execute("SELECT COUNT(*) FROM noticias WHERE data_coleta >= ? AND status != 'pendente_avaliacao'", (limiar,))
+            total_triadas = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM noticias WHERE data_coleta >= ? AND status != 'pendente_avaliacao' AND temperatura < 4", (limiar,))
+            descartadas = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM noticias WHERE data_coleta >= ? AND status != 'pendente_avaliacao' AND temperatura >= 4", (limiar,))
+            aproveitadas = cur.fetchone()[0]
+            return {"total": total_triadas, "descartadas": descartadas, "aproveitadas": aproveitadas}
+        finally:
+            con.close()
     except Exception as e:
         print(f"[ERRO] stats_24h: {e}"); return {"total": 0, "descartadas": 0, "aproveitadas": 0}
 
@@ -154,10 +176,14 @@ def carregar_templates():
 def tendencia_semanal():
     """Extrai palavras-chave mais repetidas em noticias com temp > 7 dos ultimos 7 dias."""
     try:
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        limiar = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
-        cur.execute("SELECT titulo FROM noticias WHERE temperatura > 7 AND data_coleta >= ?", (limiar,))
-        titulos = [r[0] for r in cur.fetchall()]; con.close()
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            limiar = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+            cur.execute("SELECT titulo FROM noticias WHERE temperatura > 7 AND data_coleta >= ?", (limiar,))
+            titulos = [r[0] for r in cur.fetchall()]
+        finally:
+            con.close()
         if not titulos: return "Sem dados suficientes esta semana."
         # Conta palavras relevantes (>3 chars, ignora stopwords)
         stopwords = {'the','and','for','with','has','from','that','this','are','was','will','its',
@@ -180,11 +206,15 @@ def tendencia_semanal():
 def limpar_banco_antigo(dias=15):
     """Remove noticias pendentes ou com temp < 4 com mais de X dias."""
     try:
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        limiar = (datetime.now() - timedelta(days=dias)).strftime("%Y-%m-%d %H:%M:%S")
-        cur.execute("DELETE FROM noticias WHERE data_coleta < ? AND (status='pendente_avaliacao' OR temperatura < 4)", (limiar,))
-        removidas = cur.rowcount
-        con.commit(); con.close()
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            limiar = (datetime.now() - timedelta(days=dias)).strftime("%Y-%m-%d %H:%M:%S")
+            cur.execute("DELETE FROM noticias WHERE data_coleta < ? AND (status='pendente_avaliacao' OR temperatura < 4)", (limiar,))
+            removidas = cur.rowcount
+            con.commit()
+        finally:
+            con.close()
         if removidas > 0: print(f"[LIMPEZA] {removidas} noticias antigas removidas.", flush=True)
         return removidas
     except Exception as e:
@@ -233,9 +263,13 @@ def classificar_impacto(temp):
 def buscar_noticia_por_id(noticia_id):
     """Busca uma noticia especifica pelo ID."""
     try:
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        cur.execute("SELECT id, titulo, url, temperatura, justificativa, pilar, fonte FROM noticias WHERE id=?", (noticia_id,))
-        r = cur.fetchone(); con.close(); return r
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            cur.execute("SELECT id, titulo, url, temperatura, justificativa, pilar, fonte FROM noticias WHERE id=?", (noticia_id,))
+            return cur.fetchone()
+        finally:
+            con.close()
     except Exception as e:
         print(f"[ERRO] buscar_por_id: {e}"); return None
 
@@ -730,23 +764,27 @@ async def enviar_digest_noticias(ids_permitidos=None):
         if not canal: return
 
         # Busca noticias avaliadas com nota 5-8 que ainda nao foram enviadas
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        params = []
-        filtro_ids = ""
-        if ids_permitidos is not None:
-            if not ids_permitidos:
-                con.close(); return
-            placeholders = ",".join("?" for _ in ids_permitidos)
-            filtro_ids = f" AND id IN ({placeholders})"
-            params.extend(ids_permitidos)
-        cur.execute(f"""
-            SELECT id, titulo, url, temperatura, justificativa, pilar, fonte, resumo
-            FROM noticias
-            WHERE status = 'avaliada' AND temperatura BETWEEN 5 AND 8{filtro_ids}
-            ORDER BY temperatura DESC, data_coleta DESC
-            LIMIT 10
-        """, params)
-        noticias = cur.fetchall(); con.close()
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            params = []
+            filtro_ids = ""
+            if ids_permitidos is not None:
+                if not ids_permitidos:
+                    return
+                placeholders = ",".join("?" for _ in ids_permitidos)
+                filtro_ids = f" AND id IN ({placeholders})"
+                params.extend(ids_permitidos)
+            cur.execute(f"""
+                SELECT id, titulo, url, temperatura, justificativa, pilar, fonte, resumo
+                FROM noticias
+                WHERE status = 'avaliada' AND temperatura BETWEEN 5 AND 8{filtro_ids}
+                ORDER BY temperatura DESC, data_coleta DESC
+                LIMIT 10
+            """, params)
+            noticias = cur.fetchall()
+        finally:
+            con.close()
 
         if not noticias:
             print("[DIGEST] Sem noticias nota 5-8 para enviar.", flush=True)
@@ -788,9 +826,13 @@ async def enviar_digest_noticias(ids_permitidos=None):
             await canal.send(embed=embed, view=view)
 
             # Marca como 'notificada' para nao enviar de novo
-            con2 = sqlite3.connect(CAMINHO_BD); cur2 = con2.cursor()
-            cur2.execute("UPDATE noticias SET status='notificada' WHERE id=?", (nid,))
-            con2.commit(); con2.close()
+            con2 = sqlite3.connect(CAMINHO_BD)
+            try:
+                cur2 = con2.cursor()
+                cur2.execute("UPDATE noticias SET status='notificada' WHERE id=?", (nid,))
+                con2.commit()
+            finally:
+                con2.close()
 
             # Pequena pausa para nao floodar
             await asyncio.sleep(1)

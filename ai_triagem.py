@@ -107,20 +107,20 @@ def buscar_pendentes():
     """
     try:
         conexao = sqlite3.connect(CAMINHO_BD)
-        cursor = conexao.cursor()
+        try:
+            cursor = conexao.cursor()
 
-        cursor.execute("""
-            SELECT id, titulo, url, fonte, pilar
-            FROM noticias
-            WHERE status = 'pendente_avaliacao'
-            ORDER BY data_coleta ASC
-        """)
+            cursor.execute("""
+                SELECT id, titulo, url, fonte, pilar
+                FROM noticias
+                WHERE status = 'pendente_avaliacao'
+                ORDER BY data_coleta ASC
+            """)
 
-        pendentes = cursor.fetchall()
-        conexao.close()
-
-        return pendentes
-
+            pendentes = cursor.fetchall()
+            return pendentes
+        finally:
+            conexao.close()
     except Exception as e:
         print(f"  ❌ Erro ao buscar notícias pendentes: {e}")
         return []
@@ -196,20 +196,21 @@ def atualizar_noticia(noticia_id, nota, justificativa, resumo):
     """
     try:
         conexao = sqlite3.connect(CAMINHO_BD)
-        cursor = conexao.cursor()
+        try:
+            cursor = conexao.cursor()
 
-        cursor.execute("""
-            UPDATE noticias
-            SET temperatura = ?,
-                justificativa = ?,
-                resumo = ?,
-                status = 'avaliada'
-            WHERE id = ?
-        """, (nota, justificativa, resumo, noticia_id))
+            cursor.execute("""
+                UPDATE noticias
+                SET temperatura = ?,
+                    justificativa = ?,
+                    resumo = ?,
+                    status = 'avaliada'
+                WHERE id = ?
+            """, (nota, justificativa, resumo, noticia_id))
 
-        conexao.commit()
-        conexao.close()
-
+            conexao.commit()
+        finally:
+            conexao.close()
     except Exception as e:
         print(f"    ❌ Erro ao atualizar notícia ID {noticia_id} no banco: {e}")
 

@@ -25,15 +25,19 @@ _ultima_varredura_auto = None
 def salvar_post_no_banco(titulo, url, fonte, pilar, data_pub=None):
     """Salva um post social no banco com INSERT OR IGNORE (upsert)."""
     try:
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        data = data_pub or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        cur.execute("""
-            INSERT OR IGNORE INTO noticias (titulo, url, fonte, pilar, data_publicacao, status)
-            VALUES (?, ?, ?, ?, ?, 'pendente_avaliacao')
-        """, (titulo[:500], url, fonte, pilar, data))
-        inserido = cur.rowcount > 0
-        con.commit(); con.close()
-        return inserido
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            data = data_pub or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cur.execute("""
+                INSERT OR IGNORE INTO noticias (titulo, url, fonte, pilar, data_publicacao, status)
+                VALUES (?, ?, ?, ?, ?, 'pendente_avaliacao')
+            """, (titulo[:500], url, fonte, pilar, data))
+            inserido = cur.rowcount > 0
+            con.commit()
+            return inserido
+        finally:
+            con.close()
     except Exception as e:
         print(f"  [ERRO BD] {e}"); return False
 
@@ -261,14 +265,17 @@ def ler_timestamp_varredura():
 def contar_posts_sociais_hoje():
     """Conta posts sociais capturados hoje no banco."""
     try:
-        con = sqlite3.connect(CAMINHO_BD); cur = con.cursor()
-        hoje = datetime.now().strftime("%Y-%m-%d")
-        cur.execute("SELECT COUNT(*) FROM noticias WHERE fonte LIKE 'Instagram%' OR fonte LIKE 'TikTok%' OR fonte LIKE 'YouTube%'")
-        total = cur.fetchone()[0]
-        cur.execute(f"SELECT COUNT(*) FROM noticias WHERE (fonte LIKE 'Instagram%' OR fonte LIKE 'TikTok%' OR fonte LIKE 'YouTube%') AND data_coleta >= '{hoje}'")
-        hoje_count = cur.fetchone()[0]
-        con.close()
-        return {"total": total, "hoje": hoje_count}
+        con = sqlite3.connect(CAMINHO_BD)
+        try:
+            cur = con.cursor()
+            hoje = datetime.now().strftime("%Y-%m-%d")
+            cur.execute("SELECT COUNT(*) FROM noticias WHERE fonte LIKE 'Instagram%' OR fonte LIKE 'TikTok%' OR fonte LIKE 'YouTube%'")
+            total = cur.fetchone()[0]
+            cur.execute(f"SELECT COUNT(*) FROM noticias WHERE (fonte LIKE 'Instagram%' OR fonte LIKE 'TikTok%' OR fonte LIKE 'YouTube%') AND data_coleta >= '{hoje}'")
+            hoje_count = cur.fetchone()[0]
+            return {"total": total, "hoje": hoje_count}
+        finally:
+            con.close()
     except Exception:
         return {"total": 0, "hoje": 0}
 
