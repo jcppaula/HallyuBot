@@ -521,6 +521,56 @@ async def enviar_log_discord(mensagem, titulo="Log do Sistema", cor=COR_STATUS, 
     except Exception as e:
         print(f"[ERRO] falha ao enviar log pro discord: {e}")
 
+def formatar_relatorio_varredura(novas, ignoradas, erros):
+    return (
+        "📊 RELATÓRIO DA VARREDURA\n"
+        "============================================================\n"
+        f"  ✅ Notícias NOVAS salvas no banco:    {novas}\n"
+        f"  ⏭️  Notícias IGNORADAS (duplicatas):   {ignoradas}\n"
+        f"  ❌ Fontes com ERRO de leitura:         {erros}\n"
+        f"  📁 Banco de dados: {CAMINHO_BD}\n"
+        "============================================================"
+    )
+
+def formatar_relatorio_triagem(stats):
+    if not stats:
+        stats = {"total": 0, "avaliadas": 0, "erros": 0, "urgentes": 0, "distribuicao": {}}
+
+    linhas = [
+        "📊 RELATÓRIO DA TRIAGEM",
+        "============================================================",
+        f"  ✅ Notícias avaliadas com sucesso:  {stats.get('avaliadas', 0)}/{stats.get('total', 0)}",
+        f"  ❌ Falhas de avaliação:              {stats.get('erros', 0)}",
+        f"  🚨 Alertas de plantão urgente:       {stats.get('urgentes', 0)}",
+        "",
+        "  📈 Distribuição de temperaturas:",
+    ]
+
+    distribuicao = stats.get("distribuicao", {}) or {}
+    houve_distribuicao = False
+    for nota in range(10, 0, -1):
+        quantidade = int(distribuicao.get(nota, 0) or 0)
+        if quantidade > 0:
+            houve_distribuicao = True
+            if nota >= 9:
+                label = "🔴"
+            elif nota >= 7:
+                label = "🟠"
+            elif nota >= 4:
+                label = "🟡"
+            else:
+                label = "🟢"
+            barra = "█" * min(quantidade, 40)
+            if quantidade > 40:
+                barra += "..."
+            linhas.append(f"     {label} Nota {nota:>2}: {barra} ({quantidade})")
+
+    if not houve_distribuicao:
+        linhas.append("     Sem notícias avaliadas nesta rodada.")
+
+    linhas.append("============================================================")
+    return "\n".join(linhas)
+
 # =============================================
 # Loop Automatico: Varredura + Triagem (a cada 2h)
 # =============================================
@@ -535,8 +585,8 @@ async def varredura_automatica():
 
         # Fase 1: Varrer noticias RSS
         from scraper import varrer_noticias
-        novas_rss, ign_rss = await asyncio.to_thread(varrer_noticias)
-        print(f"[AUTO-RSS] {novas_rss} novas | {ign_rss} duplicadas", flush=True)
+        novas_rss, ign_rss, erros_rss = await asyncio.to_thread(varrer_noticias)
+        print(f"[AUTO-RSS] {novas_rss} novas | {ign_rss} duplicadas | {erros_rss} fontes com erro", flush=True)
 
         # Fase 3: Triagem com IA (se ha pendentes)
         stats_triagem = None
@@ -560,11 +610,7 @@ async def varredura_automatica():
         # Limpeza periodica
         limpar_banco_antigo(dias=15)
         
-        # Envia o relatório final
-        msg_log = f"**📡 RSS:** {novas_rss} novas | {ign_rss} duplicadas ignoradas\n"
-        if stats_triagem:
-            msg_log += f"\n**🧠 Triagem da IA:**\n✅ {stats_triagem.get('avaliadas', 0)} avaliadas com sucesso\n❌ {stats_triagem.get('erros', 0)} falhas/erros\n🚨 {stats_triagem.get('urgentes', 0)} plantões urgentes disparados"
-            
+        msg_log = f"```text\n{formatar_relatorio_varredura(novas_rss, ign_rss, erros_rss)}\n\n{formatar_relatorio_triagem(stats_triagem)}\n```"
         await enviar_log_discord(msg_log, "Resumo da Varredura Completa")
 
     except Exception as e:
@@ -613,7 +659,7 @@ async def varredura_social_diaria():
             await enviar_alertas_urgentes_agora(ids_pendentes)
             await enviar_digest_noticias(ids_pendentes)
             
-            msg_log = f"**📱 Social:** {novas_social} novos posts coletados\n\n**🧠 Triagem da IA:**\n✅ {stats_triagem.get('avaliadas', 0)} avaliados com sucesso\n❌ {stats_triagem.get('erros', 0)} falhas/erros\n🚨 {stats_triagem.get('urgentes', 0)} urgentes"
+            msg_log = f"**📱 Social:** {novas_social} novos posts coletados\n\n```text\n{formatar_relatorio_triagem(stats_triagem)}\n```"
             await enviar_log_discord(msg_log, "Resumo da Varredura Social")
         else:
             print("[AUTO-SOCIAL] Nenhuma postagem nova encontrada.", flush=True)
@@ -1007,10 +1053,11 @@ async def comando_varrer(interaction: discord.Interaction):
     await interaction.response.defer(thinking=True)
     try:
         from scraper import varrer_noticias
-        novas, ignoradas = await asyncio.to_thread(varrer_noticias)
+        novas, ignoradas, erros = await asyncio.to_thread(varrer_noticias)
         embed = discord.Embed(title="Varredura Concluida", color=COR_VARRER, timestamp=datetime.now())
         embed.add_field(name="Novas", value=f"**{novas}**", inline=True)
         embed.add_field(name="Ignoradas", value=f"**{ignoradas}**", inline=True)
+        embed.add_field(name="Fontes com erro", value=f"**{erros}**", inline=True)
         embed.set_footer(text="HallyuBot V3 — Radar de Noticias")
         await interaction.followup.send(embed=embed)
     except Exception as e:
@@ -1026,7 +1073,7 @@ async def comando_triar(interaction: discord.Interaction):
             await interaction.followup.send("OPENAI_API_KEY nao configurada."); return
         from ai_triagem import executar_triagem
         ids_pendentes = buscar_ids_pendentes_triagem()
-        await asyncio.to_thread(executar_triagem)
+        stats_triagem = await asyncio.to_thread(executar_triagem)
         
         # Envia apenas itens que estavam pendentes nesta triagem manual.
         if ids_pendentes:
@@ -1039,6 +1086,7 @@ async def comando_triar(interaction: discord.Interaction):
         embed.add_field(name="Pendentes", value=f"**{contagens.get('pendente_avaliacao',0)}**", inline=True)
         embed.set_footer(text="HallyuBot V3 — Termometro de Urgencia")
         await interaction.followup.send(embed=embed)
+        await enviar_log_discord(f"```text\n{formatar_relatorio_triagem(stats_triagem)}\n```", "Resumo da Triagem Manual")
     except Exception as e:
         print(f"[ERRO] /triar: {e}")
         await interaction.followup.send(f"Erro: {str(e)[:200]}")

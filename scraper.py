@@ -64,6 +64,18 @@ FONTES_RSS = [
         "pilar": "K-Pop"
     },
     {
+        "nome": "Dispatch",
+        # Dispatch nao fornece RSS publico confiavel; o HTML fallback faz a coleta.
+        "url": "https://www.dispatch.co.kr/category/news",
+        "html_fallbacks": [
+            "https://www.dispatch.co.kr/category/news",
+            "https://www.dispatch.co.kr/",
+            "https://www.dispatch.co.kr/category/exclusive",
+            "https://www.dispatch.co.kr/category/feature",
+        ],
+        "pilar": "K-Pop"
+    },
+    {
         "nome": "Reddit r/kpop",
         "url": "https://www.reddit.com/r/kpop/top.rss",
         "fallbacks": [
@@ -189,6 +201,10 @@ def coletar_home_html(url_home, nome_fonte, pilar, limite=20):
             (tag.get_text(" ", strip=True), tag.get("href", "").strip())
             for tag in soup.select("h1 a, h2 a, h3 a, article a")
         ]
+        links.extend([
+            (tag.get("data-title", "").strip(), tag.get("href", "").strip())
+            for tag in soup.select("a[data-title]")
+        ])
     else:
         parser = LinkHTMLParser()
         parser.feed(resposta.text)
@@ -199,6 +215,7 @@ def coletar_home_html(url_home, nome_fonte, pilar, limite=20):
 
     for titulo, href in links:
         link = urljoin(url_home, href.strip())
+        titulo, data_publicacao = limpar_titulo_html(titulo)
 
         if not titulo or not link.startswith("http"):
             continue
@@ -211,13 +228,54 @@ def coletar_home_html(url_home, nome_fonte, pilar, limite=20):
             "url": link,
             "fonte": nome_fonte,
             "pilar": pilar,
-            "data_publicacao": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "data_publicacao": data_publicacao or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
 
         if len(noticias) >= limite:
             break
 
     return noticias
+
+
+def limpar_titulo_html(titulo):
+    """Remove datas grudadas no texto e tenta extrair data de publicacao."""
+    import re
+    titulo = unescape(" ".join((titulo or "").split())).strip()
+    padrao = re.compile(r"\s*(\d{4})\.(\d{2})\.(\d{2})(?:\s+(오전|오후)\s+(\d{1,2}):(\d{2}))?\s*$")
+    match = padrao.search(titulo)
+    if not match:
+        return titulo, None
+
+    ano, mes, dia, periodo, hora, minuto = match.groups()
+    data_publicacao = f"{ano}-{mes}-{dia} 00:00:00"
+    if hora and minuto:
+        h = int(hora)
+        if periodo == "오후" and h < 12:
+            h += 12
+        elif periodo == "오전" and h == 12:
+            h = 0
+        data_publicacao = f"{ano}-{mes}-{dia} {h:02d}:{minuto}:00"
+
+    return titulo[:match.start()].strip(), data_publicacao
+
+
+def coletar_html_fallbacks(urls_html, nome_fonte, pilar, limite=20):
+    """Tenta varias paginas HTML ate encontrar noticias."""
+    ultimo_erro = None
+    for url_home in urls_html:
+        try:
+            noticias = coletar_home_html(url_home, nome_fonte, pilar, limite)
+            if noticias:
+                sufixo = "HTML fallback" if len(urls_html) == 1 else f"HTML fallback: {url_home}"
+                print(f"✅ {len(noticias)} entradas encontradas ({sufixo}).")
+                return noticias
+        except Exception as e:
+            ultimo_erro = e
+        time.sleep(1)
+
+    if ultimo_erro:
+        raise ultimo_erro
+    return []
 
 
 def limpar_html_simples(texto):
@@ -340,12 +398,13 @@ def coletar_feed_rss(fonte):
                 except Exception as e:
                     ultimo_erro = e
 
-            html_fallback = fonte.get("html_fallback")
-            if html_fallback:
+            html_fallbacks = fonte.get("html_fallbacks")
+            if not html_fallbacks and fonte.get("html_fallback"):
+                html_fallbacks = [fonte["html_fallback"]]
+            if html_fallbacks:
                 try:
-                    noticias_html = coletar_home_html(html_fallback, nome_fonte, pilar)
+                    noticias_html = coletar_html_fallbacks(html_fallbacks, nome_fonte, pilar)
                     if noticias_html:
-                        print(f"✅ {len(noticias_html)} entradas encontradas (HTML fallback).")
                         return noticias_html
                 except Exception as e:
                     ultimo_erro = e
@@ -498,7 +557,7 @@ def varrer_noticias():
     print(f"  📁 Banco de dados: {CAMINHO_BD}")
     print("=" * 60)
 
-    return total_novas, total_ignoradas
+    return total_novas, total_ignoradas, total_erros
 
 
 # =============================================
