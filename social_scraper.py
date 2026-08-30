@@ -62,8 +62,13 @@ def varrer_instagram():
                 "username": [conta],
                 "resultsLimit": 1,
             }
-            run = client.actor("apify/instagram-post-scraper").call(run_input=run_input, timeout_secs=120)
-            items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+            run = client.actor("apify/instagram-post-scraper").call(run_input=run_input)
+            # apify-client >= 2.x retorna objeto Run (nao dict), handle ambos
+            try:
+                dataset_id = run["defaultDatasetId"]
+            except TypeError:
+                dataset_id = run.default_dataset_id
+            items = list(client.dataset(dataset_id).iterate_items())
 
             if items:
                 post = items[0]
@@ -108,8 +113,13 @@ def varrer_tiktok():
                 "resultsPerPage": 1,
                 "shouldDownloadVideos": False,
             }
-            run = client.actor("clockworks/free-tiktok-scraper").call(run_input=run_input, timeout_secs=120)
-            items = list(client.dataset(run["defaultDatasetId"]).iterate_items())
+            run = client.actor("clockworks/free-tiktok-scraper").call(run_input=run_input)
+            # apify-client >= 2.x retorna objeto Run (nao dict), handle ambos
+            try:
+                dataset_id = run["defaultDatasetId"]
+            except TypeError:
+                dataset_id = run.default_dataset_id
+            items = list(client.dataset(dataset_id).iterate_items())
 
             if items:
                 video = items[0]
@@ -142,17 +152,25 @@ def varrer_youtube():
         print("  [AVISO] YOUTUBE_API_KEY nao configurado."); return 0, 0
 
     from googleapiclient.discovery import build
-    youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
+    # cache_discovery=False evita usar discovery document desatualizado do cache
+    youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY, cache_discovery=False)
     novas = 0; ignoradas = 0
 
     for handle in CANAIS_YOUTUBE:
         print(f"  [YT] {handle}...", end=" ")
         try:
-            # Primeiro: resolver handle para channel ID
-            ch_resp = youtube.channels().list(part="contentDetails,snippet", forHandle=handle.lstrip("@")).execute()
+            # forHandle aceita com ou sem '@' — usar com '@' e fallback forUsername
+            handle_limpo = handle.lstrip("@")
+            ch_resp = youtube.channels().list(
+                part="contentDetails,snippet",
+                forHandle=handle  # passa com '@'
+            ).execute()
             if not ch_resp.get("items"):
-                # Fallback: buscar por username
-                ch_resp = youtube.channels().list(part="contentDetails,snippet", forUsername=handle.lstrip("@")).execute()
+                # Fallback: forUsername (canais antigos sem handle)
+                ch_resp = youtube.channels().list(
+                    part="contentDetails,snippet",
+                    forUsername=handle_limpo
+                ).execute()
             if not ch_resp.get("items"):
                 print("canal nao encontrado."); continue
 
