@@ -24,7 +24,7 @@ ADMIN_USER_ID = os.getenv("ADMIN_USER_ID")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 CAMINHO_BD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "hallyubot.db")
 CAMINHO_TEMPLATES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates", "Templates_Validados_V2.md")
-MODELO = "gpt-4o-mini"
+MODELO = "gpt-5.4-mini"
 
 # Cores do tema Hallyu
 COR_URGENTE = 0xFF0000
@@ -237,7 +237,7 @@ async def analisar_com_ia(texto):
         resp = await asyncio.to_thread(
             cli.chat.completions.create, model=MODELO,
             messages=[{"role":"system","content":prompt},{"role":"user","content":texto}],
-            response_format={"type":"json_object"}, temperature=0.3, max_tokens=300
+            response_format={"type":"json_object"}, temperature=0.3, max_completion_tokens=300
         )
         return json.loads(resp.choices[0].message.content)
     except Exception as e:
@@ -440,7 +440,7 @@ async def gerar_roteiro_com_ia(noticias, templates_texto):
         resp = await asyncio.to_thread(
             cli.chat.completions.create, model=MODELO,
             messages=[{"role":"system","content":system_prompt},{"role":"user","content":msg}],
-            temperature=0.7, max_tokens=2500
+            temperature=0.7, max_completion_tokens=2500
         )
         return resp.choices[0].message.content
     except Exception as e:
@@ -471,7 +471,7 @@ async def gerar_ideias_com_ia():
             cli.chat.completions.create, model=MODELO,
             messages=[{"role":"system","content":system_prompt},
                       {"role":"user","content":"Gere 3 ideias de videos curtos sobre cultura asiatica para hoje."}],
-            temperature=0.9, max_tokens=1500
+            temperature=0.9, max_completion_tokens=1500
         )
         return resp.choices[0].message.content
     except Exception as e:

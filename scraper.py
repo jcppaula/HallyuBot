@@ -64,24 +64,17 @@ FONTES_RSS = [
         "pilar": "K-Pop"
     },
     {
-        "nome": "Dispatch",
-        # Dispatch nao fornece RSS publico confiavel; o HTML fallback faz a coleta.
-        "url": "https://www.dispatch.co.kr/category/news",
-        "html_fallbacks": [
-            "https://www.dispatch.co.kr/category/news",
-            "https://www.dispatch.co.kr/",
-            "https://www.dispatch.co.kr/category/exclusive",
-            "https://www.dispatch.co.kr/category/feature",
-        ],
+        "nome": "Seoulbeats",
+        # Seoulbeats: analise de K-pop e cultura coreana, cobre escândalos e tendencias.
+        # Substitui o Dispatch, que renderiza via JavaScript e nao expoe RSS estatico.
+        "url": "https://seoulbeats.com/feed/",
         "pilar": "K-Pop"
     },
     {
-        "nome": "Reddit r/kpop",
-        "url": "https://www.reddit.com/r/kpop/top.rss",
-        "fallbacks": [
-            "https://old.reddit.com/r/kpop/top/.rss?t=day",
-            "https://www.reddit.com/r/kpop/new/.rss",
-        ],
+        "nome": "Hellokpop",
+        # Hellokpop: noticias de K-pop e K-drama. Substitui Reddit r/kpop,
+        # que bloqueia bots sem autenticacao OAuth desde 2023.
+        "url": "https://www.hellokpop.com/feed/",
         "pilar": "K-Pop"
     },
 
@@ -96,12 +89,10 @@ FONTES_RSS = [
         "pilar": "K-Drama"
     },
     {
-        "nome": "Reddit r/KDRAMA",
-        "url": "https://www.reddit.com/r/KDRAMA/top.rss",
-        "fallbacks": [
-            "https://old.reddit.com/r/KDRAMA/top/.rss?t=day",
-            "https://www.reddit.com/r/KDRAMA/new/.rss",
-        ],
+        "nome": "Dramabeans",
+        # Dramabeans: site referencia em K-drama, com recaps e noticias detalhadas.
+        # Substitui Reddit r/KDRAMA, bloqueado para bots sem OAuth.
+        "url": "https://www.dramabeans.com/feed/",
         "pilar": "K-Drama"
     },
 
@@ -122,15 +113,8 @@ FONTES_RSS = [
         "url": "https://www.jaynestars.com/feed/",
         "pilar": "Cultura Chinesa"
     },
-    {
-        "nome": "Reddit r/CDrama",
-        "url": "https://www.reddit.com/r/CDrama/top.rss",
-        "fallbacks": [
-            "https://old.reddit.com/r/CDrama/top/.rss?t=day",
-            "https://www.reddit.com/r/CDrama/new/.rss",
-        ],
-        "pilar": "Cultura Chinesa"
-    },
+    # Reddit r/CDrama removido: bloqueado para bots sem OAuth (HTTP 403).
+    # Cobertura de C-Drama mantida pelo DramaPanda e JayneStars acima.
 ]
 
 HEADERS_RSS = {
@@ -146,6 +130,12 @@ HEADERS_RSS = {
 HEADERS_MINIMOS = {
     "User-Agent": "Mozilla/5.0",
     "Accept": "*/*",
+}
+
+# User-Agent no formato recomendado pelo Reddit para bots sem OAuth
+HEADERS_REDDIT = {
+    "User-Agent": "HallyuBot/3.0 K-Pop monitoring bot",
+    "Accept": "application/json",
 }
 
 
@@ -199,7 +189,13 @@ def coletar_home_html(url_home, nome_fonte, pilar, limite=20):
         soup = BeautifulSoup(resposta.text, "html.parser")
         links = [
             (tag.get_text(" ", strip=True), tag.get("href", "").strip())
-            for tag in soup.select("h1 a, h2 a, h3 a, article a")
+            for tag in soup.select(
+                "h1 a, h2 a, h3 a, h4 a, article a, "
+                ".article a, .post a, .news a, .entry a, "
+                ".tit a, .title a, .headline a, "
+                ".list_news a, .news_list a, .view_list a, "
+                ".news_item a, .content_list a, .post-title a"
+            )
         ]
         links.extend([
             (tag.get("data-title", "").strip(), tag.get("href", "").strip())
@@ -309,6 +305,47 @@ def coletar_wp_json(url_api, nome_fonte, pilar, limite=20):
 
     return noticias
 
+
+def coletar_reddit_json(subreddit, nome_fonte, pilar, limite=25):
+    """Coleta posts do Reddit via JSON API publica (alternativa ao RSS bloqueado com 403).
+
+    O Reddit bloqueia feeds RSS de forma agressiva desde 2023. A JSON API
+    publica (/top.json, /new.json) funciona de forma mais confiavel com
+    um User-Agent no formato de bot.
+    """
+    url = f"https://www.reddit.com/r/{subreddit}/top.json?t=day&limit={limite}"
+    resposta = requests.get(url, headers=HEADERS_REDDIT, timeout=20)
+    resposta.raise_for_status()
+    dados = resposta.json()
+
+    noticias = []
+    for post in dados.get("data", {}).get("children", []):
+        post_data = post.get("data", {})
+        titulo = post_data.get("title", "").strip()
+        permalink = post_data.get("permalink", "")
+
+        if not titulo or not permalink:
+            continue
+
+        url_noticia = f"https://www.reddit.com{permalink}"
+
+        created = post_data.get("created_utc", 0)
+        data_pub = (
+            datetime.utcfromtimestamp(created).strftime("%Y-%m-%d %H:%M:%S")
+            if created else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+        noticias.append({
+            "titulo": titulo,
+            "url": url_noticia,
+            "fonte": nome_fonte,
+            "pilar": pilar,
+            "data_publicacao": data_pub
+        })
+
+    return noticias
+
+
 # =============================================
 # Fontes para Plano B (BeautifulSoup) — Implementação futura
 # =============================================
@@ -406,6 +443,17 @@ def coletar_feed_rss(fonte):
                     noticias_html = coletar_html_fallbacks(html_fallbacks, nome_fonte, pilar)
                     if noticias_html:
                         return noticias_html
+                except Exception as e:
+                    ultimo_erro = e
+
+            # Reddit JSON API — fallback quando RSS e demais URLs sao bloqueadas (403)
+            reddit_sub = fonte.get("reddit_subreddit")
+            if reddit_sub:
+                try:
+                    noticias_reddit = coletar_reddit_json(reddit_sub, nome_fonte, pilar)
+                    if noticias_reddit:
+                        print(f"✅ {len(noticias_reddit)} entradas encontradas (Reddit JSON API).")
+                        return noticias_reddit
                 except Exception as e:
                     ultimo_erro = e
 

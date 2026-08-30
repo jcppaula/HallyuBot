@@ -41,7 +41,7 @@ CAMINHO_BD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "h
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Modelo utilizado (GPT-4o-mini: rápido, barato e eficiente para triagem)
-MODELO = "gpt-4o-mini"
+MODELO = "gpt-5.4-mini"
 
 # =============================================
 # Prompt de Sistema — Engenharia de Prompt Modular
@@ -157,7 +157,7 @@ def avaliar_com_ia(cliente_openai, titulo, url):
             ],
             response_format={"type": "json_object"},
             temperature=0.3,  # Baixa temperatura = respostas mais consistentes
-            max_tokens=500     # JSON com nota, justificativa e resumo
+            max_completion_tokens=500     # JSON com nota, justificativa e resumo
         )
 
         # Extrai o conteúdo JSON da resposta
