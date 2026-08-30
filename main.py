@@ -2,7 +2,7 @@
 HallyuBot V3 - Orquestrador Principal (Fase 9 — Automação Total + Botões Interativos)
 """
 import os, sys, json, sqlite3, asyncio, itertools
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import discord
 from discord import app_commands
 from discord.ext import tasks
@@ -306,7 +306,7 @@ class BotaoRoteiro(View):
             embed = discord.Embed(
                 title="Roteiro Gerado — HallyuBot",
                 description=f"**{titulo[:100]}**",
-                color=COR_ROTEIRO, timestamp=datetime.now()
+                color=COR_ROTEIRO, timestamp=datetime.now(timezone.utc)
             )
             embed.add_field(name="Temperatura", value=f"**{temp}/10**", inline=True)
             embed.add_field(name="Pilar", value=pilar, inline=True)
@@ -370,7 +370,7 @@ class BotaoRoteiroPersistente(View):
             embed = discord.Embed(
                 title="Roteiro Gerado — HallyuBot",
                 description=f"**{titulo[:100]}**",
-                color=COR_ROTEIRO, timestamp=datetime.now()
+                color=COR_ROTEIRO, timestamp=datetime.now(timezone.utc)
             )
             embed.add_field(name="Temperatura", value=f"**{temp}/10**", inline=True)
             embed.add_field(name="Pilar", value=pilar, inline=True)
@@ -509,7 +509,7 @@ async def monitor_plantao():
             embed = discord.Embed(
                 title=titulo_embed,
                 description=f"**{titulo}**", color=cor,
-                timestamp=datetime.now(), url=url
+                timestamp=datetime.now(timezone.utc), url=url
             )
             embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/4539/4539472.png")
             embed.add_field(name="Temperatura", value=f"**{temp}/10**", inline=True)
@@ -548,7 +548,7 @@ async def enviar_log_discord(mensagem, titulo="Log do Sistema", cor=COR_STATUS, 
                 print(f"[AVISO] canal de logs nao encontrado: {e}")
                 return
         
-        embed = discord.Embed(title=titulo, description=mensagem[:4000], color=0xFF0000 if erro else cor, timestamp=datetime.now())
+        embed = discord.Embed(title=titulo, description=mensagem[:4000], color=0xFF0000 if erro else cor, timestamp=datetime.now(timezone.utc))
         content = f"<@{ADMIN_USER_ID}>" if erro and ADMIN_USER_ID else ""
         
         await canal.send(content=content, embed=embed)
@@ -731,7 +731,7 @@ async def enviar_alertas_urgentes_agora(ids_permitidos=None):
             embed = discord.Embed(
                 title=titulo_embed,
                 description=f"**{titulo}**", color=cor,
-                timestamp=datetime.now(), url=url
+                timestamp=datetime.now(timezone.utc), url=url
             )
             embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/4539/4539472.png")
             embed.add_field(name="Temperatura", value=f"**{temp}/10**", inline=True)
@@ -797,7 +797,7 @@ async def enviar_digest_noticias(ids_permitidos=None):
                 f"**{len(noticias)}** noticias avaliadas pela IA.\n"
                 f"Clique em **📝 Fazer Roteiro** na noticia que quiser!"
             ),
-            color=COR_STATUS, timestamp=datetime.now()
+            color=COR_STATUS, timestamp=datetime.now(timezone.utc)
         )
         embed_header.set_footer(text="HallyuBot V3 — Redacao Automatizada")
         await canal.send(embed=embed_header)
@@ -872,7 +872,7 @@ async def comando_roteiro(interaction: discord.Interaction):
         embed = discord.Embed(
             title="Roteiro Editorial — HallyuBot",
             description=f"Gerado com **{len(noticias)}** noticias + CTA de engajamento.",
-            color=COR_ROTEIRO, timestamp=datetime.now()
+            color=COR_ROTEIRO, timestamp=datetime.now(timezone.utc)
         )
         if client.user and client.user.avatar:
             embed.set_thumbnail(url=client.user.display_avatar.url)
@@ -920,7 +920,7 @@ async def comando_ideia(interaction: discord.Interaction):
         embed = discord.Embed(
             title="Ideias de Conteudo — HallyuBot",
             description="3 sugestoes de videos curtos baseadas em tendencias atuais do nicho Hallyu.",
-            color=COR_IDEIA, timestamp=datetime.now()
+            color=COR_IDEIA, timestamp=datetime.now(timezone.utc)
         )
         if client.user and client.user.avatar:
             embed.set_thumbnail(url=client.user.display_avatar.url)
@@ -959,7 +959,7 @@ async def comando_social(interaction: discord.Interaction):
         embed = discord.Embed(
             title="Sensores Sociais — Varredura Completa",
             description=f"**{total_novas}** posts novos capturados | **{total_ign}** duplicados",
-            color=COR_SOCIAL, timestamp=datetime.now()
+            color=COR_SOCIAL, timestamp=datetime.now(timezone.utc)
         )
         if client.user and client.user.avatar:
             embed.set_thumbnail(url=client.user.display_avatar.url)
@@ -995,7 +995,7 @@ async def comando_status(interaction: discord.Interaction):
         embed = discord.Embed(
             title="Painel de Saude — HallyuBot V3",
             description=f"**{total}** noticias no banco de dados.",
-            color=COR_STATUS, timestamp=datetime.now()
+            color=COR_STATUS, timestamp=datetime.now(timezone.utc)
         )
         if client.user and client.user.avatar:
             embed.set_thumbnail(url=client.user.display_avatar.url)
@@ -1066,7 +1066,7 @@ async def comando_analisar(interaction: discord.Interaction, conteudo: str):
         embed = discord.Embed(
             title="Analise Manual — HallyuBot",
             description=f"Conteudo analisado com sucesso.",
-            color=COR_ANALISAR, timestamp=datetime.now()
+            color=COR_ANALISAR, timestamp=datetime.now(timezone.utc)
         )
         embed.add_field(name=f"{emoji_t} Temperatura", value=f"**{nota}/10**", inline=True)
         embed.add_field(name="Vale video?", value="SIM" if vale_video else "NAO", inline=True)
@@ -1096,7 +1096,7 @@ async def comando_varrer(interaction: discord.Interaction):
     try:
         from scraper import varrer_noticias
         novas, ignoradas, erros = await asyncio.to_thread(varrer_noticias)
-        embed = discord.Embed(title="Varredura Concluida", color=COR_VARRER, timestamp=datetime.now())
+        embed = discord.Embed(title="Varredura Concluida", color=COR_VARRER, timestamp=datetime.now(timezone.utc))
         embed.add_field(name="Novas", value=f"**{novas}**", inline=True)
         embed.add_field(name="Ignoradas", value=f"**{ignoradas}**", inline=True)
         embed.add_field(name="Fontes com erro", value=f"**{erros}**", inline=True)
@@ -1123,7 +1123,7 @@ async def comando_triar(interaction: discord.Interaction):
             await enviar_digest_noticias(ids_pendentes)
 
         contagens = contar_noticias_por_status()
-        embed = discord.Embed(title="Triagem Concluida", color=COR_TRIAR, timestamp=datetime.now())
+        embed = discord.Embed(title="Triagem Concluida", color=COR_TRIAR, timestamp=datetime.now(timezone.utc))
         embed.add_field(name="Avaliadas", value=f"**{contagens.get('avaliada',0)}**", inline=True)
         embed.add_field(name="Pendentes", value=f"**{contagens.get('pendente_avaliacao',0)}**", inline=True)
         embed.set_footer(text="HallyuBot V3 — Termometro de Urgencia")
